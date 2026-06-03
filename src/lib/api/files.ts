@@ -4,21 +4,30 @@ import type { DataFile } from '@/types'
 const DEFAULT_WORKSPACE = 'default'
 
 function toDataFile(f: ApiFile): DataFile {
+  const raw = f as ApiFile & { size_bytes?: number; rows?: number; columns?: number }
   return {
     id: f.id ?? '',
     name: f.name ?? '',
-    size_bytes: f.size ?? 0,
-    rows: f.rows_count,
-    columns: f.columns_count ?? f.columns?.length,
+    size_bytes: f.size ?? raw.size_bytes ?? 0,
+    rows: f.rows_count ?? raw.rows,
+    columns: f.columns_count ?? f.columns?.length ?? raw.columns,
     created_at: f.created_at ?? new Date().toISOString(),
   }
 }
 
+function normalizeFileList(raw: unknown): ApiFile[] {
+  if (Array.isArray(raw)) return raw as ApiFile[]
+  if (raw && typeof raw === 'object') {
+    const obj = raw as { files?: ApiFile[]; data?: ApiFile[]; items?: ApiFile[] }
+    return obj.files ?? obj.data ?? obj.items ?? []
+  }
+  return []
+}
+
 export const filesApi = {
   async list(workspaceId: string = DEFAULT_WORKSPACE): Promise<DataFile[]> {
-    const raw = (await FilesService.getFiles(workspaceId)) as { files?: ApiFile[]; data?: ApiFile[] }
-    const items = raw.files ?? raw.data ?? []
-    return items.map(toDataFile)
+    const raw = await FilesService.getFiles(workspaceId)
+    return normalizeFileList(raw).map(toDataFile)
   },
 
   async upload(file: File, workspaceId: string = DEFAULT_WORKSPACE): Promise<DataFile> {

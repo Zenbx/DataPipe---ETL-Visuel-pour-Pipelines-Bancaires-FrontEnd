@@ -43,6 +43,15 @@ const EXEC: Record<string, string> = {
   success: 'rgba(16,185,129,0.9)',
   error:   'rgba(239,68,68,0.9)',
   failed:  'rgba(239,68,68,0.9)',
+  skipped: 'rgba(107,114,128,0.8)',
+}
+const EXEC_GLOW: Record<string, string> = {
+  running: '0 0 0 3px rgba(255,109,53,0.35), 0 0 18px rgba(255,109,53,0.45)',
+  queued:  '0 0 0 3px rgba(59,130,246,0.3), 0 0 14px rgba(59,130,246,0.35)',
+  success: '0 0 0 3px rgba(16,185,129,0.35), 0 0 16px rgba(16,185,129,0.4)',
+  error:   '0 0 0 3px rgba(239,68,68,0.35), 0 0 16px rgba(239,68,68,0.4)',
+  failed:  '0 0 0 3px rgba(239,68,68,0.35), 0 0 16px rgba(239,68,68,0.4)',
+  skipped: '0 0 0 2px rgba(107,114,128,0.25)',
 }
 const STATUS_DOT: Record<string, { bg: string; pulse: boolean }> = {
   running: { bg: '#ff6d35', pulse: true },
@@ -50,6 +59,7 @@ const STATUS_DOT: Record<string, { bg: string; pulse: boolean }> = {
   success: { bg: '#10b981', pulse: false },
   error:   { bg: '#ef4444', pulse: false },
   failed:  { bg: '#ef4444', pulse: false },
+  skipped: { bg: '#6b7280', pulse: false },
 }
 
 const SIZE = 58
@@ -128,7 +138,6 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
   const liveStatus      = useEditorStore((s) => s.nodeStatuses[id] as NodeStatus | undefined)
   const hasOutgoing     = useEditorStore((s) => s.edges.some((e) => e.source === id))
   const setSelectedNode = useEditorStore((s) => s.setSelectedNode)
-  const setNodeStatus   = useEditorStore((s) => s.setNodeStatus)
   const inspectNodeData = useEditorStore((s) => s.inspectNodeData)
   const pipelineId      = useEditorStore((s) => s.pipeline?.id)
   const openNodeDrawer  = useUIStore((s) => s.openNodeDrawer)
@@ -150,6 +159,7 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
 
   const status: NodeStatus = liveStatus ?? (d.status as NodeStatus) ?? 'idle'
   const execColor = EXEC[status]
+  const execGlow = EXEC_GLOW[status]
   const dot = STATUS_DOT[status]
 
   const color = NODE_COLOR[slug] ?? '#94a3b8'
@@ -206,8 +216,7 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
 
   const doRunStep = (e: React.MouseEvent) => {
     e.stopPropagation(); setMenuOpen(false)
-    setNodeStatus(id, 'running')
-    setTimeout(() => setNodeStatus(id, 'success'), 900)
+    toast.info('Utilisez « Exécuter » en bas du canvas pour lancer le pipeline complet')
   }
 
   const doRename = (e: React.MouseEvent) => { e.stopPropagation(); setMenuOpen(false); setDraft(label); setRenaming(true) }
@@ -361,7 +370,15 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
       ))}
 
       {/* Forme + icône */}
-      <div onClick={() => setSelectedNode(id)} style={{ position: 'relative', width: SIZE, height: SIZE, cursor: 'pointer' }}>
+      <div
+        onClick={() => setSelectedNode(id)}
+        style={{
+          position: 'relative', width: SIZE, height: SIZE, cursor: 'pointer',
+          borderRadius: shape === 'control' || shape === 'output' ? 4 : 6,
+          boxShadow: execGlow,
+          transition: 'box-shadow 0.25s ease',
+        }}
+      >
         {poly ? (
           <svg width={SIZE} height={SIZE} style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
             <path d={roundedPath(poly, radius)} fill="var(--node-bg)" stroke={borderColor} strokeWidth={strokeW} strokeLinejoin="round" style={{ transition: 'stroke 0.25s ease' }} />
@@ -375,7 +392,12 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
         </div>
 
         {dot && (
-          <span style={{ position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: '50%', background: dot.bg, border: '2px solid var(--canvas-bg)', animation: dot.pulse ? 'pulse-dot 1.4s ease-in-out infinite' : 'none' }} />
+          <span style={{
+            position: 'absolute', top: -3, right: -3, width: 11, height: 11, borderRadius: '50%',
+            background: dot.bg, border: '2px solid var(--canvas-bg)',
+            animation: dot.pulse ? 'pulse-dot 1.4s ease-in-out infinite' : 'none',
+            boxShadow: dot.pulse ? `0 0 8px ${dot.bg}` : undefined,
+          }} />
         )}
       </div>
 

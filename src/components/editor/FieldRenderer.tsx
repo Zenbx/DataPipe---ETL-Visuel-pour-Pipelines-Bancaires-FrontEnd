@@ -11,6 +11,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { filesApi } from '@/lib/api/files'
+import { datasourcesApi, type AppDatasource } from '@/lib/api/datasources'
+import { useEditorStore } from '@/store/editor.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import type { FieldDef } from '@/lib/nodeRegistry'
 
 type Cfg = Record<string, unknown>
@@ -133,17 +136,29 @@ function ListField({ field, value, onChange }: { field: FieldDef; value: Cfg[]; 
 type PickFile = { id: string; name: string; rows?: number; columns?: number }
 
 function FileField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const pipelineWorkspaceId = useEditorStore((s) => s.pipeline?.workspace_id)
+  const currentWorkspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
+  const workspaceId = pipelineWorkspaceId ?? currentWorkspaceId
+
   const [files, setFiles] = useState<PickFile[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
-    filesApi.list()
+    setLoading(true)
+    setError(null)
+    filesApi.list(workspaceId)
       .then((res) => { if (alive) setFiles(res as PickFile[]) })
-      .catch(() => { if (alive) setFiles([]) })
+      .catch(() => {
+        if (alive) {
+          setFiles([])
+          setError('Impossible de charger les fichiers')
+        }
+      })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [])
+  }, [workspaceId])
 
   if (loading) {
     return <div className="h-8 rounded-md border border-border bg-muted/40 px-3 flex items-center text-xs text-muted-foreground">Chargement des fichiers…</div>
@@ -152,10 +167,14 @@ function FileField({ value, onChange }: { value: string; onChange: (v: string) =
   if (files.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-border px-3 py-2.5 text-center">
-        <p className="text-[11px] text-muted-foreground">Aucun fichier uploadé</p>
-        <Link href="/dashboard/files" className="text-[11px] text-primary hover:underline">
-          Uploader un fichier →
-        </Link>
+        <p className="text-[11px] text-muted-foreground">
+          {error ?? 'Aucun fichier uploadé'}
+        </p>
+        {!error && (
+          <Link href="/dashboard/files" className="text-[11px] text-primary hover:underline">
+            Uploader un fichier →
+          </Link>
+        )}
       </div>
     )
   }
@@ -173,6 +192,70 @@ function FileField({ value, onChange }: { value: string; onChange: (v: string) =
               {f.rows != null && (
                 <span className="text-[10px] text-muted-foreground">· {f.rows.toLocaleString('fr-FR')} lignes</span>
               )}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+// ── Datasource picker ───────────────────────────────────────────────────────
+function DatasourceField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const pipelineWorkspaceId = useEditorStore((s) => s.pipeline?.workspace_id)
+  const currentWorkspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
+  const workspaceId = pipelineWorkspaceId ?? currentWorkspaceId
+
+  const [items, setItems] = useState<AppDatasource[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    setError(null)
+    datasourcesApi.list(workspaceId)
+      .then((res) => { if (alive) setItems(res) })
+      .catch(() => {
+        if (alive) {
+          setItems([])
+          setError('Impossible de charger les sources')
+        }
+      })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [workspaceId])
+
+  if (loading) {
+    return <div className="h-8 rounded-md border border-border bg-muted/40 px-3 flex items-center text-xs text-muted-foreground">Chargement des sources…</div>
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-border px-3 py-2.5 text-center">
+        <p className="text-[11px] text-muted-foreground">
+          {error ?? 'Aucune source de données'}
+        </p>
+        {!error && (
+          <Link href="/dashboard/datasources" className="text-[11px] text-primary hover:underline">
+            Ajouter une source →
+          </Link>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <Select value={String(value ?? '')} onValueChange={onChange}>
+      <SelectTrigger className="h-8 text-xs">
+        <SelectValue placeholder="Sélectionner une source" />
+      </SelectTrigger>
+      <SelectContent>
+        {items.map((ds) => (
+          <SelectItem key={ds.id} value={ds.id} className="text-xs">
+            <span className="flex items-center gap-2">
+              <span className="truncate">{ds.name}</span>
+              <span className="text-[10px] text-muted-foreground">· {ds.type}</span>
             </span>
           </SelectItem>
         ))}
@@ -276,6 +359,15 @@ export function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
         <div className="space-y-1">
           {labelEl}
           <FileField value={value as string} onChange={onChange} />
+          {help}
+        </div>
+      )
+
+    case 'datasource':
+      return (
+        <div className="space-y-1">
+          {labelEl}
+          <DatasourceField value={value as string} onChange={onChange} />
           {help}
         </div>
       )

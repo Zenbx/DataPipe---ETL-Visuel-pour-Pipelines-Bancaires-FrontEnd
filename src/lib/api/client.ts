@@ -34,6 +34,16 @@ const PUBLIC_API_ROOT = (
 ).replace(/\/+$/, '')
 export const PUBLIC_API_BASE = `${PUBLIC_API_ROOT}/api/v1`
 
+/** Base WebSocket : même origine (proxy Next) ou backend public direct. */
+export function getWebSocketBase(): string {
+  if (typeof window === 'undefined') return ''
+  if (API_ROOT) {
+    return API_ROOT.replace(/^http/, 'ws')
+  }
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${proto}//${window.location.host}`
+}
+
 const REFRESH_STORAGE_KEY = 'dp_refresh_token'
 
 let accessToken: string | null = null

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import {
   ZoomIn, ZoomOut, Maximize2, Play, Loader2, Lock, LockOpen, LayoutGrid,
@@ -8,6 +8,7 @@ import {
 import { useEditorStore } from '@/store/editor.store'
 import { useUIStore } from '@/store/ui.store'
 import { runsApi } from '@/lib/api/runs'
+import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses } from '@/lib/runWatcher'
 import { toast } from 'sonner'
 
 interface CanvasControlsProps {
@@ -40,9 +41,12 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
 
   const {
     nodes, edges, runStatus,
-    activeRunId, setActiveRun, setRunStatus,
-    appendLog, resetRun, setNodes,
+    activeRunId, setActiveRun, setRunStatus, setNodeStatus,
+    appendLog, resetRun, setNodes, setConsoleOpen,
   } = useEditorStore()
+
+  const stopWatchRef = useRef<(() => void) | null>(null)
+  useEffect(() => () => { stopWatchRef.current?.() }, [])
 
   // Réorganise les nœuds en colonnes selon la profondeur (gauche → droite)
   const handleTidy = useCallback(() => {
@@ -79,33 +83,54 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
   }, [nodes, edges, setNodes, fitView])
 
   const handleRun = useCallback(async () => {
+    const issues = validatePipelineForRun(nodes)
+    if (issues.length > 0) {
+      setConsoleOpen(true)
+      toast.error(issues[0], {
+        description: issues.length > 1 ? `+ ${issues.length - 1} autre(s) problème(s)` : undefined,
+      })
+      return
+    }
     try {
       const run = await runsApi.run(pipelineId)
+      stopWatchRef.current?.()
       setActiveRun(run.id)
       setRunStatus('running')
+      setConsoleOpen(true)
 
-      // Stream SSE des logs ; à la fin, on récupère le statut final du run.
-      runsApi.streamLogs(
-        run.id,
-        (log) => appendLog(log),
-        async () => {
-          try {
-            const final = await runsApi.get(pipelineId, run.id)
-            setRunStatus(final.status)
-            toast[final.status === 'success' ? 'success' : 'error'](
-              final.status === 'success' ? 'Run terminé' : 'Run terminé avec erreurs',
-            )
-          } catch { /* ignore */ }
+      const activeNodeIds = nodes
+        .filter((n) => !(n.data as Record<string, unknown>).disabled)
+        .map((n) => n.id)
+
+      stopWatchRef.current = watchRun({
+        pipelineId,
+        runId: run.id,
+        nodeIds: activeNodeIds,
+        onLog: (log) => appendLog(log),
+        onNodeStatus: (nodeId, status) => setNodeStatus(nodeId, status),
+        onComplete: (status) => {
+          finalizeRunNodeStatuses(
+            activeNodeIds,
+            useEditorStore.getState().nodeStatuses,
+            status,
+            setNodeStatus,
+          )
+          setRunStatus(status)
+          toast[status === 'success' ? 'success' : 'error'](
+            status === 'success' ? 'Run terminé' : 'Run terminé avec erreurs',
+          )
         },
-      )
+      })
     } catch {
       toast.error("Erreur lors de l'exécution")
       setRunStatus('failed')
     }
-  }, [pipelineId, setActiveRun, setRunStatus, appendLog])
+  }, [pipelineId, nodes, setActiveRun, setRunStatus, setNodeStatus, appendLog, setConsoleOpen])
 
   const handleCancel = useCallback(async () => {
     if (!activeRunId) return
+    stopWatchRef.current?.()
+    stopWatchRef.current = null
     try {
       await runsApi.cancel(pipelineId, activeRunId)
       setRunStatus('cancelled')
