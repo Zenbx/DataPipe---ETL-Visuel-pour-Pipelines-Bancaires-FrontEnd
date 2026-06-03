@@ -83,7 +83,7 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link href="/demo" className="text-xs text-gray-600 hover:text-gray-300 transition-colors">Démo</Link>
+            <Link href="/docs" className="text-xs text-gray-600 hover:text-gray-300 transition-colors">Docs</Link>
             <Link href="/login" className="text-sm text-gray-400 hover:text-gray-100 transition-colors">Connexion</Link>
             <Magnetic>
               <Link href="/register"
