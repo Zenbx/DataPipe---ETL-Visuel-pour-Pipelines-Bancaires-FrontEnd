@@ -8,6 +8,16 @@ function mapStatus(s?: string): RunStatus {
   return (s as RunStatus) ?? 'queued'
 }
 
+/** Normalise un log backend ({level:'info', message, timestamp}) vers LogEntry. */
+function toLogEntry(o: Record<string, unknown>): LogEntry {
+  return {
+    ts: String(o.ts ?? o.timestamp ?? ''),
+    level: String(o.level ?? 'info').toUpperCase() as LogEntry['level'],
+    node_id: (o.node_id as string) ?? undefined,
+    msg: String(o.msg ?? o.message ?? ''),
+  }
+}
+
 function toRun(r: ApiRun): Run {
   return {
     id: r.id ?? '',
@@ -82,8 +92,8 @@ export const runsApi = {
   },
 
   async getLogs(runId: string): Promise<LogEntry[]> {
-    const raw = (await RunsService.getRunsLogs(runId)) as { logs?: LogEntry[] }
-    return (raw.logs ?? []) as LogEntry[]
+    const raw = (await RunsService.getRunsLogs(runId)) as { logs?: Record<string, unknown>[] }
+    return (raw.logs ?? []).map(toLogEntry)
   },
 
   async getNodeOutput(runId: string, nodeId: string) {
@@ -122,7 +132,8 @@ export const runsApi = {
             const line = part.split('\n').find((l) => l.startsWith('data:'))
             if (!line) continue
             try {
-              onMessage(JSON.parse(line.slice(5).trim()))
+              const parsed = JSON.parse(line.slice(5).trim())
+              if (parsed && !parsed.done) onMessage(toLogEntry(parsed))
             } catch {
               /* ligne non-JSON ignorée */
             }

@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { filesApi } from '@/lib/api/files'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { formatBytes, getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { DataFile } from '@/types'
@@ -25,13 +26,14 @@ export default function FilesPage() {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [analyzingId, setAnalyzingId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
 
-  useEffect(() => { loadFiles() }, [])
+  useEffect(() => { loadFiles() }, [workspaceId])
 
   const loadFiles = async () => {
     setIsLoading(true)
     try {
-      const data = await filesApi.list()
+      const data = await filesApi.list(workspaceId)
       setFiles(data)
     } catch { toast.error('Erreur de chargement') }
     finally { setIsLoading(false) }
@@ -40,7 +42,7 @@ export default function FilesPage() {
   const handleUpload = async (f: File) => {
     setUploadProgress(0)
     try {
-      const result = await filesApi.upload(f)
+      const result = await filesApi.upload(f, workspaceId)
       setFiles((prev) => [result, ...prev])
       toast.success(`"${f.name}" uploadé — ${result.rows ?? '?'} lignes, ${result.columns ?? '?'} colonnes`)
     } catch {

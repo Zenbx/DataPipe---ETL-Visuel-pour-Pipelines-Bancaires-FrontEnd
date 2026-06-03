@@ -5,7 +5,7 @@ import type { NextConfig } from 'next'
  * Le navigateur n'appelle JAMAIS cette URL directement : il passe par les
  * rewrites ci-dessous (même origine), ce qui supprime tout problème de CORS.
  */
-const API_PROXY_TARGET = process.env.API_PROXY_TARGET ?? 'http://datapipe.duckdns.org'
+const API_PROXY_TARGET = process.env.API_PROXY_TARGET ?? 'https://mary-freely-thickness-allowing.trycloudflare.com'
 
 const nextConfig: NextConfig = {
   // Proxy : les requêtes same-origin /api/* sont relayées côté serveur vers le VPS.
