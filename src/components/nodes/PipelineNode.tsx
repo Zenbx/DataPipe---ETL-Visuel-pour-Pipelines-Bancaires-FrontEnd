@@ -122,16 +122,20 @@ function ToolBtn({ onClick, title, danger, children }: {
 }
 
 export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
-  const nodeStatuses    = useEditorStore((s) => s.nodeStatuses)
-  const edges           = useEditorStore((s) => s.edges)
-  const nodes           = useEditorStore((s) => s.nodes)
-  const setNodes        = useEditorStore((s) => s.setNodes)
-  const setEdges        = useEditorStore((s) => s.setEdges)
+  // Sélecteurs CIBLÉS : le nœud ne se re-rend que si SON statut ou SA connexion
+  // sortante change — pas à chaque changement global (sinon les handles vacillent
+  // et React Flow abandonne le rendu de l'arête le temps d'un frame).
+  const liveStatus      = useEditorStore((s) => s.nodeStatuses[id] as NodeStatus | undefined)
+  const hasOutgoing     = useEditorStore((s) => s.edges.some((e) => e.source === id))
   const setSelectedNode = useEditorStore((s) => s.setSelectedNode)
   const setNodeStatus   = useEditorStore((s) => s.setNodeStatus)
   const inspectNodeData = useEditorStore((s) => s.inspectNodeData)
   const pipelineId      = useEditorStore((s) => s.pipeline?.id)
   const openNodeDrawer  = useUIStore((s) => s.openNodeDrawer)
+
+  // nodes/edges lus à la demande (pas d'abonnement → pas de re-render global)
+  const setNodes = useEditorStore((s) => s.setNodes)
+  const setEdges = useEditorStore((s) => s.setEdges)
 
   const d       = data as Record<string, unknown>
   const slug    = (d.type_slug as string) ?? ''
@@ -144,7 +148,7 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
   const disabled = Boolean(d.disabled)
   const hasPinned = Boolean(d.has_pinned_data)
 
-  const status: NodeStatus = (nodeStatuses[id] as NodeStatus) ?? (d.status as NodeStatus) ?? 'idle'
+  const status: NodeStatus = liveStatus ?? (d.status as NodeStatus) ?? 'idle'
   const execColor = EXEC[status]
   const dot = STATUS_DOT[status]
 
@@ -155,7 +159,6 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
   const poly = polyPoints(shape)
   const radius = shape === 'control' || shape === 'output' ? 4 : 6
 
-  const hasOutgoing = edges.some((e) => e.source === id)
   const showAdd = outputs > 0 && def?.category !== 'Output' && def?.category !== 'Visualisation' && !hasOutgoing
 
   // ── UI states ──
@@ -176,8 +179,10 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
 
   useEffect(() => { if (renaming) inputRef.current?.focus() }, [renaming])
 
-  const patchNode = (patch: Record<string, unknown>) =>
+  const patchNode = (patch: Record<string, unknown>) => {
+    const { nodes } = useEditorStore.getState()
     setNodes(nodes.map((n) => n.id === id ? { ...n, data: { ...n.data, ...patch } } : n))
+  }
 
   // ── Actions ──
   const handleAdd = (e: React.MouseEvent) => { e.stopPropagation(); openNodeDrawer({ sourceNodeId: id }) }
@@ -185,6 +190,7 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
   const doDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (pipelineId) { try { await nodesApi.deleteNode(pipelineId, id) } catch { /* demo */ } }
+    const { nodes, edges } = useEditorStore.getState()
     setNodes(nodes.filter((n) => n.id !== id))
     setEdges(edges.filter((ed) => ed.source !== id && ed.target !== id))
     toast.success('Nœud supprimé')
@@ -214,6 +220,7 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
 
   const doCopy = async (e: React.MouseEvent) => {
     e.stopPropagation(); setMenuOpen(false)
+    const { nodes } = useEditorStore.getState()
     const src = nodes.find((n) => n.id === id)
     if (!src) return
     const position = { x: src.position.x + 40, y: src.position.y + 40 }
@@ -225,7 +232,7 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
         newId = created.id
       } catch { /* demo */ }
     }
-    setNodes([...nodes, { id: newId, type: slug, position, data: { type_slug: slug, label: `${label} (copie)`, config: cfg } }])
+    setNodes([...useEditorStore.getState().nodes, { id: newId, type: slug, position, data: { type_slug: slug, label: `${label} (copie)`, config: cfg } }])
     toast.success('Nœud copié')
   }
 
@@ -246,7 +253,7 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
     if (!pipelineId) return
     try {
       const fresh = await nodesApi.getNode(pipelineId, id)
-      setNodes(nodes.map((n) => n.id === id ? { ...n, position: fresh.position, data: { ...n.data, ...fresh.data } } : n))
+      setNodes(useEditorStore.getState().nodes.map((n) => n.id === id ? { ...n, position: fresh.position, data: { ...n.data, ...fresh.data } } : n))
       toast.success('Nœud resynchronisé')
     } catch {
       toast.error('Synchronisation impossible')
