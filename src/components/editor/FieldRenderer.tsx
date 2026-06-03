@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Plus, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -128,20 +129,53 @@ function ListField({ field, value, onChange }: { field: FieldDef; value: Cfg[]; 
   )
 }
 
-// ── File picker ─────────────────────────────────────────────────────────────
+// ── File picker : Select listant les fichiers uploadés (par nom) ─────────────
+type PickFile = { id: string; name: string; rows?: number; columns?: number }
+
 function FileField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [files, setFiles] = useState<Array<{ id: string; name: string }>>([])
-  useEffect(() => { filesApi.list().then(setFiles).catch(() => setFiles([])) }, [])
+  const [files, setFiles] = useState<PickFile[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    filesApi.list()
+      .then((res) => { if (alive) setFiles(res as PickFile[]) })
+      .catch(() => { if (alive) setFiles([]) })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [])
+
+  if (loading) {
+    return <div className="h-8 rounded-md border border-border bg-muted/40 px-3 flex items-center text-xs text-muted-foreground">Chargement des fichiers…</div>
+  }
 
   if (files.length === 0) {
-    return <Input className="h-8 text-xs" placeholder="ID du fichier (fil_…)" value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} />
+    return (
+      <div className="rounded-md border border-dashed border-border px-3 py-2.5 text-center">
+        <p className="text-[11px] text-muted-foreground">Aucun fichier uploadé</p>
+        <Link href="/dashboard/files" className="text-[11px] text-primary hover:underline">
+          Uploader un fichier →
+        </Link>
+      </div>
+    )
   }
 
   return (
     <Select value={String(value ?? '')} onValueChange={onChange}>
-      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choisir un fichier" /></SelectTrigger>
+      <SelectTrigger className="h-8 text-xs">
+        <SelectValue placeholder="Sélectionner un fichier" />
+      </SelectTrigger>
       <SelectContent>
-        {files.map((f) => <SelectItem key={f.id} value={f.id} className="text-xs">{f.name}</SelectItem>)}
+        {files.map((f) => (
+          <SelectItem key={f.id} value={f.id} className="text-xs">
+            <span className="flex items-center gap-2">
+              <span className="truncate">{f.name}</span>
+              {f.rows != null && (
+                <span className="text-[10px] text-muted-foreground">· {f.rows.toLocaleString('fr-FR')} lignes</span>
+              )}
+            </span>
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   )
