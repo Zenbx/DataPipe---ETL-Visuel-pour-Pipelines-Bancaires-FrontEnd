@@ -9,7 +9,6 @@ import { useEditorStore } from '@/store/editor.store'
 import { useUIStore } from '@/store/ui.store'
 import { runsApi } from '@/lib/api/runs'
 import { toast } from 'sonner'
-import { useAuthStore } from '@/store/auth.store'
 
 interface CanvasControlsProps {
   pipelineId: string
@@ -37,7 +36,6 @@ function CtrlBtn({
 
 export function CanvasControls({ pipelineId }: CanvasControlsProps) {
   const { zoomIn, zoomOut, fitView } = useReactFlow()
-  const { isDemoMode } = useAuthStore()
   const { canvasLocked, toggleCanvasLock } = useUIStore()
 
   const {
@@ -81,10 +79,6 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
   }, [nodes, edges, setNodes, fitView])
 
   const handleRun = useCallback(async () => {
-    if (isDemoMode) {
-      toast.info('Mode démo — connectez une API pour exécuter')
-      return
-    }
     try {
       const run = await runsApi.run(pipelineId)
       setActiveRun(run.id)
@@ -108,7 +102,7 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
       toast.error("Erreur lors de l'exécution")
       setRunStatus('failed')
     }
-  }, [pipelineId, isDemoMode, setActiveRun, setRunStatus, appendLog])
+  }, [pipelineId, setActiveRun, setRunStatus, appendLog])
 
   const handleCancel = useCallback(async () => {
     if (!activeRunId) return

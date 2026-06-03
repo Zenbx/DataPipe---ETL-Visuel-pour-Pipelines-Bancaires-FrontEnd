@@ -11,16 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { filesApi } from '@/lib/api/files'
-import { useAuthStore } from '@/store/auth.store'
 import type { FieldDef } from '@/lib/nodeRegistry'
-
-// Fichiers fictifs affichés en mode démo (pas d'appel API → pas de 401)
-const DEMO_FILES = [
-  { id: 'demo-ventes', name: 'ventes_2024.csv', rows: 12847, columns: 4 },
-  { id: 'demo-clients', name: 'clients.json', rows: 3204, columns: 6 },
-  { id: 'demo-revenus', name: 'revenus_q4.csv', rows: 8421, columns: 5 },
-  { id: 'demo-grand-livre', name: 'grand_livre.csv', rows: 54120, columns: 8 },
-]
 
 type Cfg = Record<string, unknown>
 
@@ -142,20 +133,17 @@ function ListField({ field, value, onChange }: { field: FieldDef; value: Cfg[]; 
 type PickFile = { id: string; name: string; rows?: number; columns?: number }
 
 function FileField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const isDemoMode = useAuthStore((s) => s.isDemoMode)
   const [files, setFiles] = useState<PickFile[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // En démo : pas d'appel API (sinon 401), on liste des fichiers fictifs.
-    if (isDemoMode) { setFiles(DEMO_FILES); setLoading(false); return }
     let alive = true
     filesApi.list()
       .then((res) => { if (alive) setFiles(res as PickFile[]) })
       .catch(() => { if (alive) setFiles([]) })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [isDemoMode])
+  }, [])
 
   if (loading) {
     return <div className="h-8 rounded-md border border-border bg-muted/40 px-3 flex items-center text-xs text-muted-foreground">Chargement des fichiers…</div>
