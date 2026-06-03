@@ -50,11 +50,13 @@ export function AIChatPanel({ pipelineId }: AIChatPanelProps) {
         session_id?: string
       }
       if (res.session_id) setSessionId(res.session_id)
+      // Le backend renvoie `response` = réponse IA, et `message` = ÉCHO de l'entrée
+      // utilisateur. On lit donc `response` en priorité (sinon le chat se répète).
       const reply =
-        (typeof res.message === 'object' ? res.message?.content : res.message) ??
-        res.reply ??
         res.response ??
+        res.reply ??
         res.answer ??
+        (typeof res.message === 'object' ? res.message?.content : undefined) ??
         '…'
       setMessages((prev) => [...prev, { role: 'assistant', content: String(reply) }])
     } catch {

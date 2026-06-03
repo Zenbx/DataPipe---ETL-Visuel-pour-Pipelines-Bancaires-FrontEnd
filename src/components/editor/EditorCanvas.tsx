@@ -24,6 +24,10 @@ nodeTypes.default = PipelineNode
 
 const edgeTypes: EdgeTypes = { pipeline: PipelineEdge }
 
+// Référence STABLE du marqueur de flèche : recréer cet objet à chaque survol
+// forçait React Flow à régénérer les <marker> SVG → la pointe disparaissait.
+const ARROW = { type: MarkerType.ArrowClosed, color: '#94a3b8', width: 22, height: 22, strokeWidth: 0 } as const
+
 interface EditorCanvasProps {
   pipelineId: string
 }
@@ -53,7 +57,7 @@ export function EditorCanvas({ pipelineId }: EditorCanvasProps) {
     () => edges.map((e) => ({
       ...e,
       type: 'pipeline',
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8', width: 22, height: 22, strokeWidth: 0 },
+      markerEnd: ARROW,
       data: { ...e.data, pipelineId, hovered: e.id === hoveredEdge, onKeep: enterEdge, onRelease: leaveEdge },
     })),
     [edges, pipelineId, hoveredEdge, enterEdge, leaveEdge]
@@ -151,7 +155,7 @@ export function EditorCanvas({ pipelineId }: EditorCanvasProps) {
         fitViewOptions={{ padding: 0.3 }}
         defaultEdgeOptions={{
           type: 'pipeline',
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8', width: 22, height: 22, strokeWidth: 0 },
+          markerEnd: ARROW,
           style: { stroke: '#4a4a52', strokeWidth: 2 },
           animated: false,
         }}
