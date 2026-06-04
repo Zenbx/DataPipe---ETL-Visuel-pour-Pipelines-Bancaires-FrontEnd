@@ -1,4 +1,5 @@
 import { OpenAPI } from '@/lib2'
+import { registerAuthRefresh } from '@/lib2/core/authRefresh'
 
 /**
  * Configuration centrale du client API généré (lib2).
@@ -34,14 +35,24 @@ const PUBLIC_API_ROOT = (
 ).replace(/\/+$/, '')
 export const PUBLIC_API_BASE = `${PUBLIC_API_ROOT}/api/v1`
 
-/** Base WebSocket : même origine (proxy Next) ou backend public direct. */
+/**
+ * Base WebSocket. Les rewrites Next ne proxifient PAS les WebSockets : il faut
+ * pointer le WS DIRECTEMENT vers le backend.
+ *
+ * Ordre de résolution :
+ *  1. NEXT_PUBLIC_WS_URL  → URL WS dédiée (recommandé : garde le proxy pour
+ *     l'API + WS direct vers le backend). Ex: ws://localhost:8000
+ *  2. NEXT_PUBLIC_API_URL → si l'API tape déjà le backend en direct, on en
+ *     dérive le WS (http→ws).
+ *  3. Sinon (mode proxy pur) → '' : WS désactivé. L'animation des nœuds est
+ *     dérivée des logs SSE (runWatcher), donc rien n'est cassé.
+ */
 export function getWebSocketBase(): string {
   if (typeof window === 'undefined') return ''
-  if (API_ROOT) {
-    return API_ROOT.replace(/^http/, 'ws')
-  }
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${proto}//${window.location.host}`
+  const explicit = process.env.NEXT_PUBLIC_WS_URL
+  if (explicit) return explicit.replace(/\/+$/, '').replace(/^http/, 'ws')
+  if (API_ROOT) return API_ROOT.replace(/^http/, 'ws')
+  return ''
 }
 
 const REFRESH_STORAGE_KEY = 'dp_refresh_token'

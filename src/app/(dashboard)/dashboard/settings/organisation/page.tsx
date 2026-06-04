@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { orgsApi, type AppOrg, type AppMember, type MemberRole } from '@/lib/api/orgs'
 import { workspacesApi, type AppWorkspace } from '@/lib/api/workspaces'
+import { filesApi } from '@/lib/api/files'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -24,6 +25,7 @@ export default function OrganisationPage() {
   const [invite, setInvite] = useState({ email: '', role: 'editor' as MemberRole })
   const [inviteToken, setInviteToken] = useState('')
   const [newWs, setNewWs] = useState('')
+  const [storageUsedMb, setStorageUsedMb] = useState<number | null>(null)
 
   const load = useCallback(async (orgId: string | null) => {
     if (!orgId) { setIsLoading(false); return }
@@ -38,6 +40,7 @@ export default function OrganisationPage() {
       setOrgName(o.name)
       setMembers(m)
       setWorkspaces(ws)
+      setStorageUsedMb(await filesApi.getOrgStorageUsageMb(ws.map((w) => w.id)))
     } catch { toast.error('Erreur de chargement') }
     finally { setIsLoading(false) }
   }, [])
@@ -121,7 +124,7 @@ export default function OrganisationPage() {
               </div>
               <div className="flex items-center gap-4 text-xs text-gray-600">
                 <span>{org?.members_count ?? members.length} membres</span>
-                {org?.storage_used_mb != null && <span>{org.storage_used_mb} MB utilisés</span>}
+                {storageUsedMb != null && <span>{storageUsedMb} MB utilisés</span>}
                 <Button variant="ghost" size="sm" onClick={handleDeleteOrg} className="ml-auto text-red-400 hover:text-red-300 gap-1.5">
                   <Trash2 className="h-3.5 w-3.5" /> Supprimer l&apos;organisation
                 </Button>

@@ -16,6 +16,22 @@ export interface FlowEdgeShape {
   targetHandle?: string
 }
 
+function parseConfig(raw: unknown): Record<string, unknown> {
+  if (!raw) return {}
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {}
+    } catch {
+      return {}
+    }
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>
+  return {}
+}
+
 export function toFlowNode(n: ApiNode): FlowNodeShape {
   const slug = n.type ?? 'default'
   return {
@@ -25,7 +41,7 @@ export function toFlowNode(n: ApiNode): FlowNodeShape {
     data: {
       type_slug: slug,
       label: n.label,
-      config: (n.config as Record<string, unknown>) ?? {},
+      config: parseConfig(n.config),
       has_pinned_data: n.has_pinned_data,
     },
   }
@@ -71,6 +87,22 @@ export const nodesApi = {
       label: data.label,
     })
     return toFlowNode(n)
+  },
+
+  /** Persiste les configs locales sur le serveur avant un run. */
+  async persistAllConfigs(
+    pipelineId: string,
+    nodes: Array<{ id: string; data: Record<string, unknown> }>,
+  ) {
+    await Promise.all(
+      nodes.map((n) => {
+        const config = (n.data.config as Record<string, unknown> | undefined) ?? {}
+        const label = n.data.label as string | undefined
+        return nodesApi
+          .updateNode(pipelineId, n.id, { config, label })
+          .catch(() => undefined)
+      }),
+    )
   },
 
   async deleteNode(pipelineId: string, nodeId: string) {

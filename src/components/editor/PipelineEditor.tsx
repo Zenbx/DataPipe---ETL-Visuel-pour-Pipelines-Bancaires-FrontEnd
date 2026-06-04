@@ -12,6 +12,7 @@ import { NodeInspector } from './NodeInspector'
 import { RunConsole } from './RunConsole'
 import { ConsoleBar } from './ConsoleBar'
 import { CanvasSideToolbar } from './CanvasSideToolbar'
+import { EmptyCanvasHint } from './EmptyCanvasHint'
 import { AIChatPanel } from './AIChatPanel'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -77,6 +78,7 @@ export function PipelineEditor({ pipelineId }: PipelineEditorProps) {
             {/* Canvas — relative pour que NodeDrawer / toolbar soient contenus dedans */}
             <div className="relative flex-1 overflow-hidden">
               <EditorCanvas pipelineId={pipelineId} />
+              <EmptyCanvasHint />
               <NodeDrawer pipelineId={pipelineId} />
               <CanvasSideToolbar />
             </div>

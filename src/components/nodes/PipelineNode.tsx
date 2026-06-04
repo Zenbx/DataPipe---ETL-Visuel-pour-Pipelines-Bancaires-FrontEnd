@@ -38,28 +38,21 @@ const NODE_COLOR: Record<string, string> = {
 
 
 const EXEC: Record<string, string> = {
-  running: 'rgba(255,109,53,0.95)',
-  queued:  'rgba(59,130,246,0.9)',
-  success: 'rgba(16,185,129,0.9)',
-  error:   'rgba(239,68,68,0.9)',
-  failed:  'rgba(239,68,68,0.9)',
-  skipped: 'rgba(107,114,128,0.8)',
+  running: '#ff6d35',
+  queued:  '#3b82f6',
+  success: '#10b981',
+  error:   '#ef4444',
+  failed:  '#ef4444',
+  skipped: '#6b7280',
 }
-const EXEC_GLOW: Record<string, string> = {
-  running: '0 0 0 3px rgba(255,109,53,0.35), 0 0 18px rgba(255,109,53,0.45)',
-  queued:  '0 0 0 3px rgba(59,130,246,0.3), 0 0 14px rgba(59,130,246,0.35)',
-  success: '0 0 0 3px rgba(16,185,129,0.35), 0 0 16px rgba(16,185,129,0.4)',
-  error:   '0 0 0 3px rgba(239,68,68,0.35), 0 0 16px rgba(239,68,68,0.4)',
-  failed:  '0 0 0 3px rgba(239,68,68,0.35), 0 0 16px rgba(239,68,68,0.4)',
-  skipped: '0 0 0 2px rgba(107,114,128,0.25)',
-}
-const STATUS_DOT: Record<string, { bg: string; pulse: boolean }> = {
-  running: { bg: '#ff6d35', pulse: true },
-  queued:  { bg: '#3b82f6', pulse: true },
-  success: { bg: '#10b981', pulse: false },
-  error:   { bg: '#ef4444', pulse: false },
-  failed:  { bg: '#ef4444', pulse: false },
-  skipped: { bg: '#6b7280', pulse: false },
+
+const EXEC_STROKE: Record<string, number> = {
+  running: 3,
+  queued:  2,
+  success: 2.5,
+  error:   3,
+  failed:  3,
+  skipped: 1.5,
 }
 
 const SIZE = 58
@@ -158,14 +151,11 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
   const hasPinned = Boolean(d.has_pinned_data)
 
   const status: NodeStatus = liveStatus ?? (d.status as NodeStatus) ?? 'idle'
-  const execColor = EXEC[status]
-  const execGlow = EXEC_GLOW[status]
-  const dot = STATUS_DOT[status]
-
+  const isExec = status !== 'idle'
+  const execColor = isExec ? EXEC[status] : undefined
   const color = NODE_COLOR[slug] ?? '#94a3b8'
-  // Nœud monochrome (gris) ; seule l'icône est colorée
   const borderColor = execColor ?? (selected ? 'var(--node-border-selected)' : 'var(--node-border)')
-  const strokeW = execColor ? 1.5 : 1
+  const strokeW = isExec ? (EXEC_STROKE[status] ?? 2) : (selected ? 1.5 : 1)
   const poly = polyPoints(shape)
   const radius = shape === 'control' || shape === 'output' ? 4 : 6
 
@@ -372,33 +362,31 @@ export const PipelineNode = memo(({ id, data, selected }: NodeProps) => {
       {/* Forme + icône */}
       <div
         onClick={() => setSelectedNode(id)}
-        style={{
-          position: 'relative', width: SIZE, height: SIZE, cursor: 'pointer',
-          borderRadius: shape === 'control' || shape === 'output' ? 4 : 6,
-          boxShadow: execGlow,
-          transition: 'box-shadow 0.25s ease',
-        }}
+        style={{ position: 'relative', width: SIZE, height: SIZE, cursor: 'pointer' }}
       >
         {poly ? (
           <svg width={SIZE} height={SIZE} style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
-            <path d={roundedPath(poly, radius)} fill="var(--node-bg)" stroke={borderColor} strokeWidth={strokeW} strokeLinejoin="round" style={{ transition: 'stroke 0.25s ease' }} />
+            <path
+              d={roundedPath(poly, radius)}
+              fill="var(--node-bg)"
+              stroke={borderColor}
+              strokeWidth={strokeW}
+              strokeLinejoin="round"
+              style={{ transition: 'stroke 0.3s ease, stroke-width 0.3s ease' }}
+            />
           </svg>
         ) : (
-          <div style={{ position: 'absolute', inset: 0, borderRadius: cssRadius(shape), background: 'var(--node-bg)', border: `${strokeW}px solid ${borderColor}`, transition: 'border-color 0.25s ease' }} />
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: cssRadius(shape),
+            background: 'var(--node-bg)',
+            border: `${strokeW}px solid ${borderColor}`,
+            transition: 'border-color 0.3s ease, border-width 0.3s ease',
+          }} />
         )}
 
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon size={21} strokeWidth={1.7} color={color} />
         </div>
-
-        {dot && (
-          <span style={{
-            position: 'absolute', top: -3, right: -3, width: 11, height: 11, borderRadius: '50%',
-            background: dot.bg, border: '2px solid var(--canvas-bg)',
-            animation: dot.pulse ? 'pulse-dot 1.4s ease-in-out infinite' : 'none',
-            boxShadow: dot.pulse ? `0 0 8px ${dot.bg}` : undefined,
-          }} />
-        )}
       </div>
 
       {/* Nom (ou champ de renommage) sous la forme */}

@@ -17,17 +17,20 @@ import type { WorkspaceUsage, Pipeline, Run } from '@/types'
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
+  const workspaceLoaded = useWorkspaceStore((s) => s.loaded)
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
+  const orgId = useWorkspaceStore((s) => s.currentOrgId)
   const [usage, setUsage] = useState<WorkspaceUsage | null>(null)
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [recentRuns, setRecentRuns] = useState<Run[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    if (!workspaceLoaded) return
     const load = async () => {
       try {
         const [usageData, pipelinesData] = await Promise.all([
-          analyticsApi.getWorkspaceUsage(),
+          analyticsApi.getWorkspaceUsage(workspaceId, orgId ?? undefined),
           pipelinesApi.list({ workspace_id: workspaceId, per_page: 5 }),
         ])
         setUsage(usageData)
@@ -41,7 +44,7 @@ export default function DashboardPage() {
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId])
+  }, [workspaceId, workspaceLoaded])
 
   const statusVariant = (status?: string) => {
     if (status === 'success') return 'success'

@@ -14,13 +14,14 @@ import { NODE_REGISTRY_MAP } from '@/lib/nodeRegistry'
 import { cn } from '@/lib/utils'
 import { FieldRenderer } from './FieldRenderer'
 import { NodeDataPanel } from './NodeDataPanel'
+import { normalizeNodeConfig } from '@/lib/runWatcher'
 
 interface NodeInspectorProps {
   pipelineId: string
 }
 
 export function NodeInspector({ pipelineId }: NodeInspectorProps) {
-  const { selectedNodeId, nodes, setSelectedNode, setNodes, edges, setEdges } = useEditorStore()
+  const { selectedNodeId, nodes, setSelectedNode, setNodes, edges, setEdges, markDirty } = useEditorStore()
   const [config, setConfig] = useState<Record<string, unknown>>({})
   const [label, setLabel] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -37,7 +38,7 @@ export function NodeInspector({ pipelineId }: NodeInspectorProps) {
   useEffect(() => {
     if (!selectedNode) return
     const d = selectedNode.data as Record<string, unknown>
-    setConfig((d.config as Record<string, unknown>) ?? {})
+    setConfig(normalizeNodeConfig(d.config))
     setLabel((d.label as string) ?? def?.label ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNodeId])
@@ -45,13 +46,28 @@ export function NodeInspector({ pipelineId }: NodeInspectorProps) {
 
   if (!selectedNode || !typeSlug || !def) return null
 
+  const syncToStore = (nextConfig: Record<string, unknown>, nextLabel?: string) => {
+    setNodes(useEditorStore.getState().nodes.map((n) =>
+      n.id === selectedNode.id
+        ? {
+            ...n,
+            data: {
+              ...n.data,
+              config: nextConfig,
+              ...(nextLabel !== undefined ? { label: nextLabel } : {}),
+            },
+          }
+        : n
+    ))
+    markDirty()
+  }
+
   const setField = (key: string, value: unknown) => {
-    setConfig((prev) => {
-      const next = { ...prev }
-      if (value === undefined) delete next[key]
-      else next[key] = value
-      return next
-    })
+    const next = { ...config }
+    if (value === undefined || value === '') delete next[key]
+    else next[key] = value
+    setConfig(next)
+    syncToStore(next)
   }
 
   const handleSave = async () => {
@@ -148,7 +164,11 @@ export function NodeInspector({ pipelineId }: NodeInspectorProps) {
           {/* Label */}
           <div className="space-y-1.5">
             <Label className="text-[11px] text-gray-400">Label affiché</Label>
-            <Input className="h-8 text-xs" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={def.label} />
+            <Input className="h-8 text-xs" value={label} onChange={(e) => {
+              const v = e.target.value
+              setLabel(v)
+              syncToStore(config, v)
+            }} placeholder={def.label} />
           </div>
 
           {def.fields.length > 0 && <Separator />}

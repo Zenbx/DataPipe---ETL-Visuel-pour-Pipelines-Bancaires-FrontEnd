@@ -25,6 +25,9 @@ export function connectRunWebSocket(
 ): () => void {
   const token = authTokens.getAccess()
   const base = getWebSocketBase()
+  // Pas d'URL WS dédiée (mode proxy) → on n'essaie pas (sinon 404). L'animation
+  // des nœuds est dérivée des logs SSE dans runWatcher.
+  if (!base) return () => {}
   const qs = token ? `?token=${encodeURIComponent(token)}` : ''
   let ws: WebSocket | null = null
   let closed = false

@@ -3,10 +3,23 @@ import type { ApiKey } from '@/types'
 
 type ApiKeyWithSecret = ApiKey & { key: string }
 
+function normalizeApiKey(raw: Record<string, unknown>): ApiKey {
+  const scopes = raw.scopes
+  return {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    prefix: String(raw.prefix ?? raw.key_prefix ?? ''),
+    scopes: Array.isArray(scopes) ? scopes.map(String) : [],
+    created_at: String(raw.created_at ?? ''),
+    last_used_at: raw.last_used_at != null ? String(raw.last_used_at) : undefined,
+  }
+}
+
 export const apiKeysApi = {
   async list(): Promise<ApiKey[]> {
     const raw = await ApiKeysService.getApiKeys()
-    return (raw.api_keys ?? []) as unknown as ApiKey[]
+    const items = raw.api_keys ?? []
+    return items.map((k) => normalizeApiKey(k as Record<string, unknown>))
   },
 
   /**
@@ -18,12 +31,8 @@ export const apiKeysApi = {
     const k = (raw.api_key ?? raw) as Record<string, unknown>
     const secret = String(raw.key ?? k.key ?? '')
     return {
-      id: String(k.id ?? ''),
-      name: String(k.name ?? data.name),
-      prefix: String(k.prefix ?? secret.slice(0, 8)),
-      scopes: (k.scopes as string[]) ?? data.scopes,
-      created_at: String(k.created_at ?? new Date().toISOString()),
-      last_used_at: k.last_used_at as string | undefined,
+      ...normalizeApiKey({ ...k, scopes: k.scopes ?? data.scopes }),
+      prefix: String(k.prefix ?? k.key_prefix ?? secret.slice(0, 8)),
       key: secret,
     }
   },

@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import {
-  ZoomIn, ZoomOut, Maximize2, Play, Loader2, Lock, LockOpen, LayoutGrid,
+  ZoomIn, ZoomOut, Maximize2, Play, Loader2, Lock, LockOpen, LayoutGrid, Square,
 } from 'lucide-react'
 import { useEditorStore } from '@/store/editor.store'
 import { useUIStore } from '@/store/ui.store'
 import { runsApi } from '@/lib/api/runs'
-import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses } from '@/lib/runWatcher'
+import { nodesApi } from '@/lib/api/nodes'
+import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses, computeExecutionOrder } from '@/lib/runWatcher'
 import { toast } from 'sonner'
 
 interface CanvasControlsProps {
@@ -83,7 +84,8 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
   }, [nodes, edges, setNodes, fitView])
 
   const handleRun = useCallback(async () => {
-    const issues = validatePipelineForRun(nodes)
+    const currentNodes = useEditorStore.getState().nodes
+    const issues = validatePipelineForRun(currentNodes)
     if (issues.length > 0) {
       setConsoleOpen(true)
       toast.error(issues[0], {
@@ -92,25 +94,25 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
       return
     }
     try {
+      await nodesApi.persistAllConfigs(
+        pipelineId,
+        currentNodes.map((n) => ({ id: n.id, data: n.data as Record<string, unknown> })),
+      )
       const run = await runsApi.run(pipelineId)
       stopWatchRef.current?.()
       setActiveRun(run.id)
       setRunStatus('running')
       setConsoleOpen(true)
 
-      const activeNodeIds = nodes
-        .filter((n) => !(n.data as Record<string, unknown>).disabled)
-        .map((n) => n.id)
-
+      const { nodes: ns, edges: es } = useEditorStore.getState()
       stopWatchRef.current = watchRun({
         pipelineId,
         runId: run.id,
-        nodeIds: activeNodeIds,
+        executionOrder: computeExecutionOrder(ns, es),
         onLog: (log) => appendLog(log),
         onNodeStatus: (nodeId, status) => setNodeStatus(nodeId, status),
         onComplete: (status) => {
           finalizeRunNodeStatuses(
-            activeNodeIds,
             useEditorStore.getState().nodeStatuses,
             status,
             setNodeStatus,
@@ -125,7 +127,7 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
       toast.error("Erreur lors de l'exécution")
       setRunStatus('failed')
     }
-  }, [pipelineId, nodes, setActiveRun, setRunStatus, setNodeStatus, appendLog, setConsoleOpen])
+  }, [pipelineId, setActiveRun, setRunStatus, setNodeStatus, appendLog, setConsoleOpen])
 
   const handleCancel = useCallback(async () => {
     if (!activeRunId) return
@@ -169,14 +171,25 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
       {/* Centre — bouton Exécuter */}
       <div className="pointer-events-auto">
         {isQueued ? (
-          <button
-            onClick={handleCancel}
-            className="flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#c41f1f] active:scale-[0.98]"
-            style={{ background: '#dc2626' }}
-          >
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Arrêter
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Carré + spinner (état en cours, sans texte) */}
+            <div
+              className="flex items-center justify-center rounded-lg text-white cursor-default"
+              style={{ width: 38, height: 38, background: 'var(--primary)' }}
+              title="Exécution en cours…"
+            >
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+            {/* Bouton stop : rouge avec carré blanc */}
+            <button
+              onClick={handleCancel}
+              className="flex items-center justify-center rounded-lg transition-colors hover:bg-[#c41f1f] active:scale-95"
+              style={{ width: 38, height: 38, background: '#dc2626' }}
+              title="Arrêter l'exécution"
+            >
+              <Square className="h-3.5 w-3.5 text-white" fill="white" strokeWidth={0} />
+            </button>
+          </div>
         ) : (
           <button
             onClick={handleRun}

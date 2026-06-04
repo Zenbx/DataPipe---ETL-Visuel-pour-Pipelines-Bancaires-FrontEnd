@@ -15,7 +15,8 @@ import {
 import { useEditorStore } from '@/store/editor.store'
 import { pipelinesApi } from '@/lib/api/pipelines'
 import { runsApi } from '@/lib/api/runs'
-import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses } from '@/lib/runWatcher'
+import { nodesApi } from '@/lib/api/nodes'
+import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses, computeExecutionOrder } from '@/lib/runWatcher'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -52,7 +53,8 @@ export function EditorTopBar({ pipelineId }: EditorTopBarProps) {
   }
 
   const handleRun = async () => {
-    const issues = validatePipelineForRun(nodes)
+    const currentNodes = useEditorStore.getState().nodes
+    const issues = validatePipelineForRun(currentNodes)
     if (issues.length > 0) {
       setConsoleOpen(true)
       toast.error(issues[0], {
@@ -62,25 +64,25 @@ export function EditorTopBar({ pipelineId }: EditorTopBarProps) {
     }
     try {
       if (isDirty) await handleSave()
+      await nodesApi.persistAllConfigs(
+        pipelineId,
+        currentNodes.map((n) => ({ id: n.id, data: n.data as Record<string, unknown> })),
+      )
       const run = await runsApi.run(pipelineId)
       stopWatchRef.current?.()
       setActiveRun(run.id)
       setRunStatus('running')
       setConsoleOpen(true)
 
-      const activeNodeIds = nodes
-        .filter((n) => !(n.data as Record<string, unknown>).disabled)
-        .map((n) => n.id)
-
+      const { nodes: ns, edges: es } = useEditorStore.getState()
       stopWatchRef.current = watchRun({
         pipelineId,
         runId: run.id,
-        nodeIds: activeNodeIds,
+        executionOrder: computeExecutionOrder(ns, es),
         onLog: (log) => appendLog(log),
         onNodeStatus: (nodeId, status) => setNodeStatus(nodeId, status),
         onComplete: (status) => {
           finalizeRunNodeStatuses(
-            activeNodeIds,
             useEditorStore.getState().nodeStatuses,
             status,
             setNodeStatus,

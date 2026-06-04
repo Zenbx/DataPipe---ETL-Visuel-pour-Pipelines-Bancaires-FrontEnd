@@ -84,12 +84,12 @@ export default function ApiKeysPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground">{key.name}</p>
-                  <p className="text-xs text-gray-600 font-mono">{key.prefix}…</p>
+                  <p className="text-xs text-gray-600 font-mono">{key.prefix || '—'}…</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex gap-1">
-                  {key.scopes.map((s) => (
+                  {(key.scopes ?? []).map((s) => (
                     <Badge key={s} variant="secondary" className="text-[10px] h-5">{s}</Badge>
                   ))}
                 </div>

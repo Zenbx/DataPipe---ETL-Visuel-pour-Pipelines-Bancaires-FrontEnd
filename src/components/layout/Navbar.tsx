@@ -11,6 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/store/auth.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { useNotificationStore } from '@/store/notification.store'
 import { logout as logoutRequest } from '@/lib/api/auth'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher'
@@ -34,6 +35,7 @@ export function Navbar({ title }: NavbarProps) {
       await logoutRequest()
     } catch {}
     clearAuth()
+    useWorkspaceStore.getState().reset()
     router.push('/login')
     toast.success('Déconnecté')
   }

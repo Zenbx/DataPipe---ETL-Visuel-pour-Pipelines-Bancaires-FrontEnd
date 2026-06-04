@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Building2, Plug, Key, Monitor, ShieldCheck, Trash2, LogOut } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import {
   updateProfile, changePassword, listSessions, revokeSession, revokeAllSessions,
   verifyEmail, deleteAccount, type AppSession,
@@ -68,6 +69,7 @@ export default function SettingsPage() {
     try {
       await deleteAccount(deletePwd)
       clearAuth()
+      useWorkspaceStore.getState().reset()
       toast.success('Compte supprimé')
       router.push('/login')
     } catch { toast.error('Mot de passe incorrect') }

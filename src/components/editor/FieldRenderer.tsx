@@ -185,6 +185,11 @@ function FileField({ value, onChange }: { value: string; onChange: (v: string) =
         <SelectValue placeholder="Sélectionner un fichier" />
       </SelectTrigger>
       <SelectContent>
+        {value && !files.some((f) => f.id === value) && (
+          <SelectItem value={String(value)} className="text-xs">
+            Fichier enregistré ({String(value).slice(-8)})
+          </SelectItem>
+        )}
         {files.map((f) => (
           <SelectItem key={f.id} value={f.id} className="text-xs">
             <span className="flex items-center gap-2">
