@@ -59,8 +59,14 @@ export const resultsApi = {
   },
 
   async getPipelineResults(pipelineId: string): Promise<ResultItem[]> {
-    const raw = (await ResultsService.getPipelinesResults(pipelineId)) as { results?: ResultItem[]; data?: ResultItem[] }
-    return raw.results ?? raw.data ?? []
+    const raw = (await ResultsService.getPipelinesResults(pipelineId)) as {
+      results?: (ResultItem & { run_id?: string })[]
+      data?: (ResultItem & { run_id?: string })[]
+    }
+    const items = raw.results ?? raw.data ?? []
+    // Résilience : certains backends renvoient `run_id` sans `id`. Or download/
+    // export utilisent `id` (= run_id). On comble le `id` manquant.
+    return items.map((r) => ({ ...r, id: r.id ?? r.run_id ?? '' }))
   },
 
   async getResult(resultId: string) {
