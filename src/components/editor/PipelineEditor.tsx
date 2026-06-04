@@ -81,6 +81,25 @@ export function PipelineEditor({ pipelineId }: PipelineEditorProps) {
     }
   })
 
+  // Filet de sécurité temps réel : si le SSE rate un événement, on détecte un
+  // changement (nb de nœuds/arêtes) toutes les 5 s et on recharge. Ne touche à
+  // rien tant que rien n'a changé (positions/édition locale préservées).
+  useEffect(() => {
+    if (!pipelineId) return
+    const poll = setInterval(async () => {
+      try {
+        const p = await pipelinesApi.get(pipelineId)
+        const st = useEditorStore.getState()
+        const sN = ((p.nodes as unknown[]) ?? []).length
+        const sE = ((p.edges as unknown[]) ?? []).length
+        if (sN !== st.nodes.length || sE !== st.edges.length) {
+          st.setPipeline(p)
+        }
+      } catch { /* ignore */ }
+    }, 5000)
+    return () => clearInterval(poll)
+  }, [pipelineId])
+
   if (isLoading) {
     return (
       <div className="flex h-full w-full flex-col bg-background">
