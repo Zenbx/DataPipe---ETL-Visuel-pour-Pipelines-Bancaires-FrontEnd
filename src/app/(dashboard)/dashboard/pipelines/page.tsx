@@ -20,7 +20,6 @@ import { Label } from '@/components/ui/label'
 import { pipelinesApi } from '@/lib/api/pipelines'
 import { getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
-import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import type { Pipeline } from '@/types'
 import { PipelineVersionsDialog } from './PipelineVersionsDialog'
@@ -28,7 +27,6 @@ import { MergeDialog } from './MergeDialog'
 
 export default function PipelinesPage() {
   const router = useRouter()
-  const { isDemoMode } = useAuthStore()
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [search, setSearch] = useState('')
@@ -50,18 +48,7 @@ export default function PipelinesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, statusFilter, workspaceId])
 
-  const DEMO_PIPELINES: Pipeline[] = [
-    { id: 'demo-sales', name: 'Analyse des ventes 2024', description: 'CSV → Filtre → Agrégation → Chart', status: 'active', nodes_count: 4, last_run_status: 'success', last_run_at: new Date(Date.now() - 3600000).toISOString(), workspace_id: 'demo' },
-    { id: 'demo-crm',   name: 'Nettoyage CRM clients',  description: 'JSON → Dédoublon → Map → Export', status: 'active', nodes_count: 4, last_run_status: 'success', last_run_at: new Date(Date.now() - 7200000).toISOString(), workspace_id: 'demo' },
-    { id: 'demo-ai',    name: 'IA Transform — revenus',  description: 'CSV → IA Transform → Aperçu', status: 'active', nodes_count: 3, last_run_status: 'failed',  last_run_at: new Date(Date.now() - 900000).toISOString(),  workspace_id: 'demo' },
-  ]
-
   const loadPipelines = async () => {
-    if (isDemoMode) {
-      setIsLoading(false)
-      setPipelines(DEMO_PIPELINES)
-      return
-    }
     // 'default' = placeholder du store avant résolution du vrai workspace :
     // on évite un /pipelines?workspace_id=default -> 404 (+ toast d'erreur).
     if (!workspaceId || workspaceId === 'default') return
@@ -86,12 +73,7 @@ export default function PipelinesPage() {
       setNewName('')
       router.push(`/dashboard/pipelines/${p.id}/editor`)
     } catch {
-      if (isDemoMode) {
-        toast.info('Mode démo — connexion API requise pour créer un pipeline')
-        setShowCreate(false)
-      } else {
-        toast.error('Erreur lors de la création')
-      }
+      toast.error('Erreur lors de la création')
     } finally {
       setIsCreating(false)
     }
@@ -225,9 +207,7 @@ export default function PipelinesPage() {
           <GitBranch className="h-12 w-12 text-gray-700" />
           <div className="text-center">
             <p className="text-gray-400 font-medium">Aucun pipeline</p>
-            <p className="text-sm text-gray-600 mt-1">
-              {isDemoMode ? 'Connectez une API pour voir vos pipelines' : 'Créez votre premier pipeline pour commencer'}
-            </p>
+            <p className="text-sm text-gray-600 mt-1">Créez votre premier pipeline pour commencer</p>
           </div>
           <Button onClick={() => setShowCreate(true)} className="gap-2">
             <Plus className="h-4 w-4" /> Créer un pipeline

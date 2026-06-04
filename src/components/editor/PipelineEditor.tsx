@@ -8,7 +8,6 @@ import { useEditorStore } from '@/store/editor.store'
 import { pipelinesApi } from '@/lib/api/pipelines'
 import { usePipelineEvents } from '@/lib/usePipelineEvents'
 import { NODE_REGISTRY } from '@/lib/nodeRegistry'
-import { DEMO_PIPELINES_DATA } from '@/lib/demoPipelines'
 import { EditorTopBar } from './EditorTopBar'
 import { NodeDrawer } from './NodeDrawer'
 import { EditorCanvas } from './EditorCanvas'
@@ -39,17 +38,6 @@ export function PipelineEditor({ pipelineId }: PipelineEditorProps) {
 
     const load = async () => {
       try {
-        // Demo pipelines: load mock data without API
-        if (pipelineId.startsWith('demo-')) {
-          const mock = DEMO_PIPELINES_DATA[pipelineId]
-          if (mock) {
-            setPipeline(mock.pipeline)
-            useEditorStore.getState().setNodes(mock.nodes)
-            useEditorStore.getState().setEdges(mock.edges)
-          }
-          setIsLoading(false)
-          return
-        }
         const pipeline = await pipelinesApi.get(pipelineId)
         setPipeline(pipeline)
       } catch (e) {

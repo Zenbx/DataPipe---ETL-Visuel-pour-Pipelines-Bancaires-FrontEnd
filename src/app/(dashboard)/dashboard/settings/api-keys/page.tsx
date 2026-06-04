@@ -12,13 +12,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { apiKeysApi } from '@/lib/api/apikeys'
 import { getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
-import { useAuthStore } from '@/store/auth.store'
 import type { ApiKey } from '@/types'
 
 const SCOPES = ['pipelines:read', 'pipelines:write', 'runs:write', 'files:write']
 
 export default function ApiKeysPage() {
-  const { isDemoMode } = useAuthStore()
   const [keys, setKeys] = useState<ApiKey[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -29,7 +27,6 @@ export default function ApiKeysPage() {
   useEffect(() => { load() }, [])
 
   const load = async () => {
-    if (isDemoMode) { setIsLoading(false); return }
     setIsLoading(true)
     try {
       setKeys(await apiKeysApi.list())
@@ -75,7 +72,7 @@ export default function ApiKeysPage() {
         <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : keys.length === 0 ? (
         <div className="text-center py-10 text-gray-600 text-sm">
-          {isDemoMode ? 'Connectez une API pour gérer les clés' : 'Aucune clé API créée'}
+          Aucune clé API créée
         </div>
       ) : (
         <div className="space-y-2">

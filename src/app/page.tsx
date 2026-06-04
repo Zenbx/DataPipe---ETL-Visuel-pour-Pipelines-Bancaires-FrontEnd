@@ -1151,8 +1151,8 @@ function Footer() {
 // ─────────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const router = useRouter()
-  const { isAuthenticated, isDemoMode } = useAuthStore()
-  useEffect(() => { if (isAuthenticated && !isDemoMode) router.push('/dashboard') }, [isAuthenticated, isDemoMode, router])
+  const { isAuthenticated } = useAuthStore()
+  useEffect(() => { if (isAuthenticated) router.push('/dashboard') }, [isAuthenticated, router])
 
   return (
     <div className="${poppins.variable} relative min-h-screen overflow-x-hidden text-gray-200" style={{
@@ -1224,7 +1224,6 @@ export default function LandingPage() {
             </nav>
 
             <div className="flex items-center gap-3">
-              <Link href="/demo" className="text-xs text-gray-600 hover:text-gray-300 transition-colors">Démo</Link>
               <Link href="/login" className="text-sm text-gray-400 hover:text-gray-100 transition-colors">Connexion</Link>
               <Magnetic>
                 <Link href="/register"
@@ -1258,11 +1257,11 @@ export default function LandingPage() {
             </Link>
           </Magnetic>
           <Magnetic>
-            <Link href="/demo"
+            <Link href="/docs"
               className="flex items-center gap-2 rounded-xl border px-7 py-3.5 text-base font-medium text-gray-400 transition-all hover:text-gray-100 hover:bg-white/5"
               style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
               <Play className="h-4 w-4" fill="currentColor" />
-              Voir la démo
+              Voir la documentation
             </Link>
           </Magnetic>
         </div>
@@ -1358,10 +1357,10 @@ export default function LandingPage() {
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </Magnetic>
-            <Link href="/demo"
+            <Link href="/docs"
               className="flex items-center gap-2 rounded-xl border px-8 py-4 text-base font-medium text-gray-400 hover:text-gray-100 hover:bg-white/5 transition-all"
               style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-              Voir la démo
+              Voir la documentation
             </Link>
           </div>
           <div className="mt-6 flex items-center justify-center gap-7">

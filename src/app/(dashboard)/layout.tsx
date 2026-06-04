@@ -14,12 +14,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const pathname = usePathname()
   const isEditor = pathname?.includes('/editor')
-  const { isAuthenticated, isLoading, isDemoMode, setUser, clearAuth, setLoading } = useAuthStore()
+  const { isAuthenticated, isLoading, setUser, clearAuth, setLoading } = useAuthStore()
 
   useEffect(() => {
-    // Demo mode bypasses auth check
-    if (isDemoMode) { setLoading(false); return }
-
     const check = async () => {
       try {
         await initApiClient()
@@ -35,7 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } else {
       setLoading(false)
     }
-  }, [isAuthenticated, isDemoMode, setUser, clearAuth, router, setLoading])
+  }, [isAuthenticated, setUser, clearAuth, router, setLoading])
 
   if (isLoading) {
     return (

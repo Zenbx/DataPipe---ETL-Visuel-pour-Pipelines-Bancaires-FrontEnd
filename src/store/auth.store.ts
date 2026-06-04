@@ -4,28 +4,16 @@ import type { User, Organisation } from '@/types'
 import { authTokens } from '@/lib/api/client'
 import { useWorkspaceStore } from './workspace.store'
 
-const DEMO_USER: User = {
-  id: 'demo-user',
-  email: 'demo@datapipe.io',
-  name: 'Demo User',
-  avatar_url: undefined,
-  verified: true,
-  created_at: new Date().toISOString(),
-  orgs: [{ id: 'demo-org', name: 'Demo Org', role: 'admin' }],
-}
-
 interface AuthState {
   user: User | null
   currentOrg: Organisation | null
   isAuthenticated: boolean
   isLoading: boolean
-  isDemoMode: boolean
 
   setUser: (user: User) => void
   setCurrentOrg: (org: Organisation) => void
   clearAuth: () => void
   setLoading: (v: boolean) => void
-  enableDemoMode: () => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -35,7 +23,6 @@ export const useAuthStore = create<AuthState>()(
       currentOrg: null,
       isAuthenticated: false,
       isLoading: true,
-      isDemoMode: false,
 
       setUser: (user) => set({ user, isAuthenticated: true, isLoading: false }),
 
@@ -45,17 +32,10 @@ export const useAuthStore = create<AuthState>()(
         authTokens.clear()
         // Évite qu'un workspace/org d'un user précédent reste collé (localStorage).
         useWorkspaceStore.getState().reset()
-        set({ user: null, currentOrg: null, isAuthenticated: false, isLoading: false, isDemoMode: false })
+        set({ user: null, currentOrg: null, isAuthenticated: false, isLoading: false })
       },
 
       setLoading: (v) => set({ isLoading: v }),
-
-      enableDemoMode: () => set({
-        user: DEMO_USER,
-        isAuthenticated: true,
-        isLoading: false,
-        isDemoMode: true,
-      }),
     }),
     {
       name: 'datapipe-auth',
