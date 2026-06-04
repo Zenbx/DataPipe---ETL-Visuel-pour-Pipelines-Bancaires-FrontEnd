@@ -45,6 +45,7 @@ export default function DatasourcesPage() {
   useEffect(() => { load() }, [workspaceId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = async () => {
+    if (!workspaceId || workspaceId === 'default') return
     setIsLoading(true)
     try { setItems(await datasourcesApi.list(workspaceId)) }
     catch { toast.error('Erreur de chargement') }

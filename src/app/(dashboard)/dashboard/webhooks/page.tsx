@@ -42,6 +42,7 @@ export default function WebhooksPage() {
   useEffect(() => { load() }, [workspaceId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = async () => {
+    if (!workspaceId || workspaceId === 'default') return
     setIsLoading(true)
     try {
       const [wh, pls] = await Promise.all([

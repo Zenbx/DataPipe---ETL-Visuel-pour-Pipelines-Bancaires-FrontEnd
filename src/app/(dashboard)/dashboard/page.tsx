@@ -26,7 +26,9 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (!workspaceLoaded) return
+    // Attendre la résolution du store, et ignorer le placeholder 'default'
+    // (évite /pipelines?workspace_id=default -> 404).
+    if (!workspaceLoaded || !workspaceId || workspaceId === 'default') return
     const load = async () => {
       try {
         const [usageData, pipelinesData] = await Promise.all([
@@ -43,6 +45,10 @@ export default function DashboardPage() {
       finally { setIsLoading(false) }
     }
     load()
+    // L'assistant IA émet cet événement après une action -> on rafraîchit.
+    const onChange = () => load()
+    window.addEventListener('datapipe:pipelines-changed', onChange)
+    return () => window.removeEventListener('datapipe:pipelines-changed', onChange)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, workspaceLoaded])
 

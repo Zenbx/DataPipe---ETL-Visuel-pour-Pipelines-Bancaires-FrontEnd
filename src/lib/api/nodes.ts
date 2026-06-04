@@ -47,13 +47,19 @@ export function toFlowNode(n: ApiNode): FlowNodeShape {
   }
 }
 
+// Les nœuds à une seule entrée/sortie utilisent un handle SANS id (défaut React
+// Flow). Le backend renvoie parfois les sentinelles 'output'/'input', qui ne
+// correspondent à aucun handle réel -> l'edge ne s'affiche pas. On les neutralise.
+const _normHandle = (h?: string): string | undefined =>
+  h && h !== 'output' && h !== 'input' ? h : undefined
+
 export function toFlowEdge(e: ApiEdge): FlowEdgeShape {
   return {
     id: e.id ?? '',
     source: e.source ?? '',
     target: e.target ?? '',
-    sourceHandle: e.sourceHandle,
-    targetHandle: e.targetHandle,
+    sourceHandle: _normHandle(e.sourceHandle),
+    targetHandle: _normHandle(e.targetHandle),
   }
 }
 

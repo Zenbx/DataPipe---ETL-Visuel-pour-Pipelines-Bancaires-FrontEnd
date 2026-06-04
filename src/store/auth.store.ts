@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, Organisation } from '@/types'
 import { authTokens } from '@/lib/api/client'
+import { useWorkspaceStore } from './workspace.store'
 
 interface AuthState {
   user: User | null
@@ -29,6 +30,8 @@ export const useAuthStore = create<AuthState>()(
 
       clearAuth: () => {
         authTokens.clear()
+        // Évite qu'un workspace/org d'un user précédent reste collé (localStorage).
+        useWorkspaceStore.getState().reset()
         set({ user: null, currentOrg: null, isAuthenticated: false, isLoading: false })
       },
 

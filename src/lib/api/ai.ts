@@ -1,5 +1,34 @@
 import { AiService } from '@/lib2'
 import type { AIUsage } from '@/types'
+import { API_BASE, authTokens, refreshAccessToken } from './client'
+
+export interface AgentAction { action: string; ok: boolean; message: string; run_id?: string | null }
+export interface AgentExecuteResult {
+  type: 'reply' | 'action' | 'plan'
+  reply: string
+  pipeline_id?: string | null
+  pipeline?: { id: string; name: string; nodes_count?: number } | null
+  actions: AgentAction[]
+  run_id?: string | null
+  model?: string
+}
+
+/** POST authentifié (fetch direct) avec un retry 401 -> refresh -> rejoue. */
+async function authPost<T>(path: string, body: unknown): Promise<T> {
+  const call = () =>
+    fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authTokens.getAccess() ? { Authorization: `Bearer ${authTokens.getAccess()}` } : {}),
+      },
+      body: JSON.stringify(body),
+    })
+  let res = await call()
+  if (res.status === 401 && (await refreshAccessToken())) res = await call()
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<T>
+}
 
 /**
  * Helpers IA mappés sur les endpoints réellement exposés par le backend.
@@ -18,6 +47,19 @@ export const aiApi = {
 
   async getChatHistory(sessionId: string) {
     return AiService.getAiChatHistory(sessionId)
+  },
+
+  /**
+   * Chat « mode action » : message naturel -> l'agent backend PLANIFIE et
+   * EXÉCUTE (crée/modifie/exécute des pipelines), comme le bot Telegram.
+   * `pipelineId` donne le contexte du pipeline courant (facultatif).
+   */
+  async agentExecute(message: string, pipelineId?: string | null, columns?: string[]) {
+    return authPost<AgentExecuteResult>('/ai/agent/execute', {
+      message,
+      pipeline_id: pipelineId ?? undefined,
+      context: columns && columns.length ? { columns } : undefined,
+    })
   },
 
   /** Génère une requête SQL depuis une description naturelle. */

@@ -41,10 +41,17 @@ export default function PipelinesPage() {
 
   useEffect(() => {
     loadPipelines()
+    // L'assistant IA émet cet événement après une action -> on rafraîchit.
+    const onChange = () => loadPipelines()
+    window.addEventListener('datapipe:pipelines-changed', onChange)
+    return () => window.removeEventListener('datapipe:pipelines-changed', onChange)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, statusFilter, workspaceId])
 
   const loadPipelines = async () => {
+    // 'default' = placeholder du store avant résolution du vrai workspace :
+    // on évite un /pipelines?workspace_id=default -> 404 (+ toast d'erreur).
+    if (!workspaceId || workspaceId === 'default') return
     setIsLoading(true)
     try {
       const res = await pipelinesApi.list({ workspace_id: workspaceId, search, status: statusFilter, per_page: 50 })
