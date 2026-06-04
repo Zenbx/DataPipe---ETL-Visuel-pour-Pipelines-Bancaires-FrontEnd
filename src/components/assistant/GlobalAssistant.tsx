@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Sparkles, Send, X, Loader2, ArrowUpRight, Zap } from 'lucide-react'
+import { Send, X, Loader2, ArrowUpRight, Zap, Bot } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -78,29 +78,39 @@ export function GlobalAssistant() {
 
   return (
     <>
-      {/* Bouton flottant */}
+      {/* Bouton flottant — pilule en accord avec l'interface (surface card + accent) */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
           title="Assistant IA"
-          className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105"
+          className="group fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-2xl border border-border bg-card py-2 pl-2 pr-4 transition-all hover:-translate-y-0.5 hover:border-primary/40"
+          style={{ boxShadow: '0 8px 30px rgba(0,0,0,0.18)' }}
         >
-          <Sparkles className="h-6 w-6" />
+          {/* Carré accent avec icône bot + point "en ligne" */}
+          <span
+            className="relative flex h-9 w-9 items-center justify-center rounded-xl"
+            style={{ background: 'var(--primary)' }}
+          >
+            <Bot className="h-5 w-5 text-white" />
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-card" style={{ animation: 'pulse-dot 2s ease-in-out infinite' }} />
+          </span>
+          <span className="text-sm font-semibold text-foreground">Assistant IA</span>
         </button>
       )}
 
       {/* Panneau */}
       {open && (
         <div className="fixed bottom-6 right-6 z-50 flex h-[560px] max-h-[80vh] w-[400px] max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-border bg-card shadow-2xl">
-          {/* En-tête */}
+          {/* En-tête — cohérent avec le bouton flottant (carré accent + point en ligne) */}
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <Sparkles className="h-4 w-4 text-primary" />
-              </div>
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--primary)' }}>
+                <Bot className="h-5 w-5 text-white" />
+                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-card" style={{ animation: 'pulse-dot 2s ease-in-out infinite' }} />
+              </span>
               <div>
                 <p className="text-sm font-semibold text-foreground">Assistant IA</p>
-                <p className="text-[11px] text-gray-500">Mode action · pilote tes pipelines</p>
+                <p className="text-[11px] text-muted-foreground">Mode action · pilote tes pipelines</p>
               </div>
             </div>
             <Button variant="ghost" size="icon-sm" onClick={() => setOpen(false)}>
@@ -112,13 +122,18 @@ export function GlobalAssistant() {
           <ScrollArea className="flex-1 px-4 py-3">
             <div className="space-y-3">
               {messages.map((m, i) => (
-                <div key={i} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                <div key={i} className={cn('flex items-end gap-2', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                  {m.role === 'assistant' && (
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--primary)' }}>
+                      <Bot className="h-3.5 w-3.5 text-white" />
+                    </span>
+                  )}
                   <div
                     className={cn(
-                      'max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap',
+                      'max-w-[82%] px-3 py-2 text-sm whitespace-pre-wrap',
                       m.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-foreground',
+                        ? 'rounded-2xl rounded-br-sm bg-primary text-primary-foreground'
+                        : 'rounded-2xl rounded-bl-sm border border-border bg-muted text-foreground',
                     )}
                   >
                     {m.content}
@@ -127,7 +142,7 @@ export function GlobalAssistant() {
                         href={`/dashboard/pipelines/${m.pipelineId}/editor`}
                         className="mt-2 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                       >
-                        Ouvrir dans l'éditeur <ArrowUpRight className="h-3 w-3" />
+                        Ouvrir dans l&apos;éditeur <ArrowUpRight className="h-3 w-3" />
                       </Link>
                     )}
                   </div>
