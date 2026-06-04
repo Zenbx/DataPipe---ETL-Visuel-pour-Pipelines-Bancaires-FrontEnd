@@ -10,12 +10,39 @@ function mapStatus(s?: string): RunStatus {
 
 /** Normalise un log backend ({level:'info', message, timestamp}) vers LogEntry. */
 function toLogEntry(o: Record<string, unknown>): LogEntry {
+  const levelRaw = String(o.level ?? 'info').toUpperCase()
+  const level = (levelRaw === 'WARN' ? 'WARNING' : levelRaw) as LogEntry['level']
   return {
-    ts: String(o.ts ?? o.timestamp ?? ''),
-    level: String(o.level ?? 'info').toUpperCase() as LogEntry['level'],
+    ts: String(o.ts ?? o.timestamp ?? new Date().toISOString()),
+    level: level === 'INFO' || level === 'WARNING' || level === 'ERROR' ? level : 'INFO',
     node_id: (o.node_id as string) ?? undefined,
     msg: String(o.msg ?? o.message ?? ''),
   }
+}
+
+function parseSSEEvents(buffer: string): { events: Record<string, unknown>[]; rest: string } {
+  const normalized = buffer.replace(/\r\n/g, '\n')
+  const parts = normalized.split('\n\n')
+  const rest = parts.pop() ?? ''
+  const events: Record<string, unknown>[] = []
+
+  for (const part of parts) {
+    if (!part.trim()) continue
+    const dataLines = part
+      .split('\n')
+      .filter((l) => l.startsWith('data:'))
+      .map((l) => l.slice(5).trimStart())
+    if (dataLines.length === 0) continue
+    const payload = dataLines.join('\n')
+    try {
+      const parsed = JSON.parse(payload) as Record<string, unknown>
+      if (parsed && !parsed.done) events.push(parsed)
+    } catch {
+      /* ligne non-JSON ignorée */
+    }
+  }
+
+  return { events, rest }
 }
 
 function toRun(r: ApiRun): Run {
@@ -92,8 +119,12 @@ export const runsApi = {
   },
 
   async getLogs(runId: string): Promise<LogEntry[]> {
-    const raw = (await RunsService.getRunsLogs(runId)) as { logs?: Record<string, unknown>[] }
-    return (raw.logs ?? []).map(toLogEntry)
+    const raw = (await RunsService.getRunsLogs(runId)) as {
+      logs?: Record<string, unknown>[]
+      data?: Record<string, unknown>[]
+    }
+    const items = raw.logs ?? raw.data ?? []
+    return items.map(toLogEntry)
   },
 
   async getNodeOutput(runId: string, nodeId: string) {
@@ -114,11 +145,17 @@ export const runsApi = {
     const token = authTokens.getAccess()
 
     fetch(`${API_BASE}/runs/${runId}/logs/stream`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers: {
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       signal: controller.signal,
     })
       .then(async (res) => {
-        if (!res.body) return
+        if (!res.ok || !res.body) {
+          onEnd?.()
+          return
+        }
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
@@ -126,18 +163,13 @@ export const runsApi = {
           const { done, value } = await reader.read()
           if (done) break
           buffer += decoder.decode(value, { stream: true })
-          const parts = buffer.split('\n\n')
-          buffer = parts.pop() ?? ''
-          for (const part of parts) {
-            const line = part.split('\n').find((l) => l.startsWith('data:'))
-            if (!line) continue
-            try {
-              const parsed = JSON.parse(line.slice(5).trim())
-              if (parsed && !parsed.done) onMessage(toLogEntry(parsed))
-            } catch {
-              /* ligne non-JSON ignorée */
-            }
-          }
+          const { events, rest } = parseSSEEvents(buffer)
+          buffer = rest
+          for (const ev of events) onMessage(toLogEntry(ev))
+        }
+        if (buffer.trim()) {
+          const { events } = parseSSEEvents(`${buffer}\n\n`)
+          for (const ev of events) onMessage(toLogEntry(ev))
         }
         onEnd?.()
       })

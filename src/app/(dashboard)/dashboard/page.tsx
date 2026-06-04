@@ -17,20 +17,22 @@ import type { WorkspaceUsage, Pipeline, Run } from '@/types'
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
+  const workspaceLoaded = useWorkspaceStore((s) => s.loaded)
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
+  const orgId = useWorkspaceStore((s) => s.currentOrgId)
   const [usage, setUsage] = useState<WorkspaceUsage | null>(null)
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [recentRuns, setRecentRuns] = useState<Run[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // 'default' = placeholder du store avant résolution du vrai workspace.
-    // On attend la vraie valeur pour éviter un /pipelines?workspace_id=default -> 404.
-    if (!workspaceId || workspaceId === 'default') return
+    // Attendre la résolution du store, et ignorer le placeholder 'default'
+    // (évite /pipelines?workspace_id=default -> 404).
+    if (!workspaceLoaded || !workspaceId || workspaceId === 'default') return
     const load = async () => {
       try {
         const [usageData, pipelinesData] = await Promise.all([
-          analyticsApi.getWorkspaceUsage(),
+          analyticsApi.getWorkspaceUsage(workspaceId, orgId ?? undefined),
           pipelinesApi.list({ workspace_id: workspaceId, per_page: 5 }),
         ])
         setUsage(usageData)
@@ -48,7 +50,7 @@ export default function DashboardPage() {
     window.addEventListener('datapipe:pipelines-changed', onChange)
     return () => window.removeEventListener('datapipe:pipelines-changed', onChange)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId])
+  }, [workspaceId, workspaceLoaded])
 
   const statusVariant = (status?: string) => {
     if (status === 'success') return 'success'

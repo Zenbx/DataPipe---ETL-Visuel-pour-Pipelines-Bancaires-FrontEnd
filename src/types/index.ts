@@ -473,7 +473,7 @@ export interface SystemLimits {
 export interface WSNodeStatusEvent {
   type: 'node_status'
   node_id: string
-  status: RunStatus
+  status: string
   rows_out?: number
   duration_ms?: number
 }

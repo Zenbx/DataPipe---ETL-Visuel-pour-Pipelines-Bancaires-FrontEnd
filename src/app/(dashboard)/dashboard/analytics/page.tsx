@@ -8,10 +8,13 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { analyticsApi, type TimelinePoint, type AuditLog } from '@/lib/api/analytics'
 import { aiApi } from '@/lib/api/ai'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { formatNumber, getRelativeTime } from '@/lib/utils'
 import type { WorkspaceUsage, AIUsage } from '@/types'
 
 export default function AnalyticsPage() {
+  const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
+  const orgId = useWorkspaceStore((s) => s.currentOrgId)
   const [usage, setUsage] = useState<WorkspaceUsage | null>(null)
   const [aiUsage, setAiUsage] = useState<AIUsage | null>(null)
   const [timeline, setTimeline] = useState<TimelinePoint[]>([])
@@ -19,19 +22,19 @@ export default function AnalyticsPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    setIsLoading(true)
     Promise.all([
-      analyticsApi.getWorkspaceUsage(),
+      analyticsApi.getWorkspaceUsage(workspaceId, orgId ?? undefined),
       aiApi.getUsage(),
-      analyticsApi.getRunsTimeline(30).catch(() => [] as TimelinePoint[]),
-      analyticsApi.getAuditLogs({ page: 1 }).catch(() => [] as AuditLog[]),
-      analyticsApi.getOverview().catch(() => null),
+      analyticsApi.getRunsTimeline(workspaceId, 30).catch(() => [] as TimelinePoint[]),
+      analyticsApi.getAuditLogs({ orgId: orgId ?? undefined, page: 1 }).catch(() => [] as AuditLog[]),
     ]).then(([u, ai, tl, logs]) => {
       setUsage(u)
       setAiUsage(ai)
       setTimeline(tl)
       setAudit(logs)
     }).catch(() => {}).finally(() => setIsLoading(false))
-  }, [])
+  }, [workspaceId, orgId])
 
   const maxRuns = Math.max(1, ...timeline.map((t) => t.runs ?? 0))
 

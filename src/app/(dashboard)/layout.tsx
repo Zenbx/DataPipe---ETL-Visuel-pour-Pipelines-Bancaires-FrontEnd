@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { Navbar } from '@/components/layout/Navbar'
 import { GlobalAssistant } from '@/components/assistant/GlobalAssistant'
 import { useAuthStore } from '@/store/auth.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { getCurrentUser } from '@/lib/api/auth'
 import { initApiClient } from '@/lib/api/client'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,25 +15,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const pathname = usePathname()
   const isEditor = pathname?.includes('/editor')
-  const { isAuthenticated, isLoading, setUser, clearAuth, setLoading } = useAuthStore()
+  const { isLoading, setUser, clearAuth, setLoading } = useAuthStore()
 
   useEffect(() => {
-    const check = async () => {
+    let cancelled = false
+
+    const bootstrap = async () => {
+      setLoading(true)
       try {
-        await initApiClient()
+        // Toujours restaurer l'access_token depuis le refresh_token (perdu au reload).
+        const ok = await initApiClient()
+        if (!ok) {
+          useWorkspaceStore.getState().reset()
+          clearAuth()
+          router.push('/login')
+          return
+        }
         const user = await getCurrentUser()
+        if (cancelled) return
+        // Valider org/workspace persistés avant d'afficher le dashboard.
+        await useWorkspaceStore.getState().init({ force: true })
+        if (cancelled) return
         setUser(user)
       } catch {
-        clearAuth()
-        router.push('/login')
+        if (!cancelled) {
+          useWorkspaceStore.getState().reset()
+          clearAuth()
+          router.push('/login')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
-    if (!isAuthenticated) {
-      check()
-    } else {
-      setLoading(false)
-    }
-  }, [isAuthenticated, setUser, clearAuth, router, setLoading])
+
+    void bootstrap()
+    return () => { cancelled = true }
+  }, [setUser, clearAuth, router, setLoading])
 
   if (isLoading) {
     return (
@@ -52,13 +70,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    // Tout l'écran est fixe — sidebar + contenu se partagent l'espace en flex
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-        {/* La navbar est cachée sur l'éditeur pour lui donner toute la hauteur */}
         {!isEditor && <Navbar />}
-        {/* overflow-hidden sur l'éditeur = canvas fixe ; overflow-auto ailleurs = scroll normal */}
         <main className={isEditor ? 'flex flex-1 overflow-hidden' : 'flex-1 overflow-auto'}>
           {children}
         </main>

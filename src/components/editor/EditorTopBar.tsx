@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Play, Square, RotateCcw, Save, ChevronLeft, Zap,
@@ -15,6 +15,8 @@ import {
 import { useEditorStore } from '@/store/editor.store'
 import { pipelinesApi } from '@/lib/api/pipelines'
 import { runsApi } from '@/lib/api/runs'
+import { nodesApi } from '@/lib/api/nodes'
+import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses, computeExecutionOrder } from '@/lib/runWatcher'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -25,11 +27,14 @@ interface EditorTopBarProps {
 export function EditorTopBar({ pipelineId }: EditorTopBarProps) {
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
+  const stopWatchRef = useRef<(() => void) | null>(null)
   const {
     pipeline, nodes, edges, isDirty, isRunning, runStatus,
     activeRunId, setActiveRun, setRunStatus, setNodeStatus, appendLog,
     resetRun, isConsoleOpen, setConsoleOpen, setAIChatOpen,
   } = useEditorStore()
+
+  useEffect(() => () => { stopWatchRef.current?.() }, [])
 
   const handleSave = async () => {
     if (!pipeline) return
@@ -48,28 +53,46 @@ export function EditorTopBar({ pipelineId }: EditorTopBarProps) {
   }
 
   const handleRun = async () => {
+    const currentNodes = useEditorStore.getState().nodes
+    const issues = validatePipelineForRun(currentNodes)
+    if (issues.length > 0) {
+      setConsoleOpen(true)
+      toast.error(issues[0], {
+        description: issues.length > 1 ? `+ ${issues.length - 1} autre(s) problème(s)` : undefined,
+      })
+      return
+    }
     try {
-      // Save first
       if (isDirty) await handleSave()
+      await nodesApi.persistAllConfigs(
+        pipelineId,
+        currentNodes.map((n) => ({ id: n.id, data: n.data as Record<string, unknown> })),
+      )
       const run = await runsApi.run(pipelineId)
+      stopWatchRef.current?.()
       setActiveRun(run.id)
       setRunStatus('running')
       setConsoleOpen(true)
 
-      // Stream SSE des logs ; statut final récupéré à la fin du flux.
-      runsApi.streamLogs(
-        run.id,
-        (log) => appendLog(log),
-        async () => {
-          try {
-            const final = await runsApi.get(pipelineId, run.id)
-            setRunStatus(final.status)
-            toast[final.status === 'success' ? 'success' : 'error'](
-              final.status === 'success' ? 'Run terminé avec succès' : 'Run terminé avec erreurs',
-            )
-          } catch { /* ignore */ }
+      const { nodes: ns, edges: es } = useEditorStore.getState()
+      stopWatchRef.current = watchRun({
+        pipelineId,
+        runId: run.id,
+        executionOrder: computeExecutionOrder(ns, es),
+        onLog: (log) => appendLog(log),
+        onNodeStatus: (nodeId, status) => setNodeStatus(nodeId, status),
+        onComplete: (status) => {
+          finalizeRunNodeStatuses(
+            useEditorStore.getState().nodeStatuses,
+            status,
+            setNodeStatus,
+          )
+          setRunStatus(status)
+          toast[status === 'success' ? 'success' : 'error'](
+            status === 'success' ? 'Run terminé avec succès' : 'Run terminé avec erreurs',
+          )
         },
-      )
+      })
     } catch {
       toast.error('Erreur lors du lancement')
     }
@@ -77,6 +100,8 @@ export function EditorTopBar({ pipelineId }: EditorTopBarProps) {
 
   const handleCancel = async () => {
     if (!activeRunId) return
+    stopWatchRef.current?.()
+    stopWatchRef.current = null
     try {
       await runsApi.cancel(pipelineId, activeRunId)
       setRunStatus('cancelled')

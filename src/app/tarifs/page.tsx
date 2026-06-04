@@ -103,7 +103,7 @@ export default function TarifsPage() {
         </div>
 
         <p className="mt-10 text-center text-xs text-gray-700">
-          Tous les plans incluent les 22 nœuds et le mode démo. Annulable à tout moment.
+          Tous les plans incluent les 22 nœuds. Annulable à tout moment.
         </p>
       </div>
     </MarketingShell>

@@ -1,13 +1,15 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import {
-  ZoomIn, ZoomOut, Maximize2, Play, Loader2, Lock, LockOpen, LayoutGrid,
+  ZoomIn, ZoomOut, Maximize2, Play, Loader2, Lock, LockOpen, LayoutGrid, Square,
 } from 'lucide-react'
 import { useEditorStore } from '@/store/editor.store'
 import { useUIStore } from '@/store/ui.store'
 import { runsApi } from '@/lib/api/runs'
+import { nodesApi } from '@/lib/api/nodes'
+import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses, computeExecutionOrder } from '@/lib/runWatcher'
 import { toast } from 'sonner'
 
 interface CanvasControlsProps {
@@ -40,9 +42,12 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
 
   const {
     nodes, edges, runStatus,
-    activeRunId, setActiveRun, setRunStatus,
-    appendLog, resetRun, setNodes,
+    activeRunId, setActiveRun, setRunStatus, setNodeStatus,
+    appendLog, resetRun, setNodes, setConsoleOpen,
   } = useEditorStore()
+
+  const stopWatchRef = useRef<(() => void) | null>(null)
+  useEffect(() => () => { stopWatchRef.current?.() }, [])
 
   // Réorganise les nœuds en colonnes selon la profondeur (gauche → droite)
   const handleTidy = useCallback(() => {
@@ -79,33 +84,55 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
   }, [nodes, edges, setNodes, fitView])
 
   const handleRun = useCallback(async () => {
+    const currentNodes = useEditorStore.getState().nodes
+    const issues = validatePipelineForRun(currentNodes)
+    if (issues.length > 0) {
+      setConsoleOpen(true)
+      toast.error(issues[0], {
+        description: issues.length > 1 ? `+ ${issues.length - 1} autre(s) problème(s)` : undefined,
+      })
+      return
+    }
     try {
+      await nodesApi.persistAllConfigs(
+        pipelineId,
+        currentNodes.map((n) => ({ id: n.id, data: n.data as Record<string, unknown> })),
+      )
       const run = await runsApi.run(pipelineId)
+      stopWatchRef.current?.()
       setActiveRun(run.id)
       setRunStatus('running')
+      setConsoleOpen(true)
 
-      // Stream SSE des logs ; à la fin, on récupère le statut final du run.
-      runsApi.streamLogs(
-        run.id,
-        (log) => appendLog(log),
-        async () => {
-          try {
-            const final = await runsApi.get(pipelineId, run.id)
-            setRunStatus(final.status)
-            toast[final.status === 'success' ? 'success' : 'error'](
-              final.status === 'success' ? 'Run terminé' : 'Run terminé avec erreurs',
-            )
-          } catch { /* ignore */ }
+      const { nodes: ns, edges: es } = useEditorStore.getState()
+      stopWatchRef.current = watchRun({
+        pipelineId,
+        runId: run.id,
+        executionOrder: computeExecutionOrder(ns, es),
+        onLog: (log) => appendLog(log),
+        onNodeStatus: (nodeId, status) => setNodeStatus(nodeId, status),
+        onComplete: (status) => {
+          finalizeRunNodeStatuses(
+            useEditorStore.getState().nodeStatuses,
+            status,
+            setNodeStatus,
+          )
+          setRunStatus(status)
+          toast[status === 'success' ? 'success' : 'error'](
+            status === 'success' ? 'Run terminé' : 'Run terminé avec erreurs',
+          )
         },
-      )
+      })
     } catch {
       toast.error("Erreur lors de l'exécution")
       setRunStatus('failed')
     }
-  }, [pipelineId, setActiveRun, setRunStatus, appendLog])
+  }, [pipelineId, setActiveRun, setRunStatus, setNodeStatus, appendLog, setConsoleOpen])
 
   const handleCancel = useCallback(async () => {
     if (!activeRunId) return
+    stopWatchRef.current?.()
+    stopWatchRef.current = null
     try {
       await runsApi.cancel(pipelineId, activeRunId)
       setRunStatus('cancelled')
@@ -144,14 +171,25 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
       {/* Centre — bouton Exécuter */}
       <div className="pointer-events-auto">
         {isQueued ? (
-          <button
-            onClick={handleCancel}
-            className="flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#c41f1f] active:scale-[0.98]"
-            style={{ background: '#dc2626' }}
-          >
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Arrêter
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Carré + spinner (état en cours, sans texte) */}
+            <div
+              className="flex items-center justify-center rounded-lg text-white cursor-default"
+              style={{ width: 38, height: 38, background: 'var(--primary)' }}
+              title="Exécution en cours…"
+            >
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+            {/* Bouton stop : rouge avec carré blanc */}
+            <button
+              onClick={handleCancel}
+              className="flex items-center justify-center rounded-lg transition-colors hover:bg-[#c41f1f] active:scale-95"
+              style={{ width: 38, height: 38, background: '#dc2626' }}
+              title="Arrêter l'exécution"
+            >
+              <Square className="h-3.5 w-3.5 text-white" fill="white" strokeWidth={0} />
+            </button>
+          </div>
         ) : (
           <button
             onClick={handleRun}

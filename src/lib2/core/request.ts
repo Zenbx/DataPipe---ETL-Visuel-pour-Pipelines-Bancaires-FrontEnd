@@ -8,7 +8,7 @@ import type { ApiResult } from './ApiResult';
 import { CancelablePromise } from './CancelablePromise';
 import type { OnCancel } from './CancelablePromise';
 import type { OpenAPIConfig } from './OpenAPI';
-import { tryRefresh } from '../_refresh';
+import { tryAuthRefresh } from './authRefresh';
 
 export const isDefined = <T>(value: T | null | undefined): value is Exclude<T, null | undefined> => {
     return value !== undefined && value !== null;
@@ -305,7 +305,7 @@ export const request = <T>(config: OpenAPIConfig, options: ApiRequestOptions): C
                 // Retry 401 : access_token expiré -> refresh puis on rejoue UNE
                 // fois (sauf sur les routes d'auth, pour éviter toute boucle).
                 if (response.status === 401 && !options.url.includes('/auth/') && !onCancel.isCancelled) {
-                    const refreshed = await tryRefresh();
+                    const refreshed = await tryAuthRefresh();
                     if (refreshed && !onCancel.isCancelled) {
                         const retryHeaders = await getHeaders(config, options);
                         response = await sendRequest(config, options, url, body, formData, retryHeaders, onCancel);

@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
         source: '/api/:path*',
         destination: `${API_PROXY_TARGET}/api/:path*`,
       },
+      {
+        source: '/ws/:path*',
+        // Next.js n'accepte que http(s) en destination ; le upgrade WebSocket est relayé tel quel.
+        destination: `${API_PROXY_TARGET}/ws/:path*`,
+      },
     ]
   },
 }

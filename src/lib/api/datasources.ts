@@ -29,8 +29,13 @@ function toDatasource(d: Datasource): AppDatasource {
 
 export const datasourcesApi = {
   async list(workspaceId = 'default'): Promise<AppDatasource[]> {
-    const res = await DatasourcesService.getDatasources(workspaceId)
-    return (res.datasources ?? []).map(toDatasource)
+    const raw = await DatasourcesService.getDatasources(workspaceId) as {
+      datasources?: Datasource[]
+      data?: Datasource[]
+      items?: Datasource[]
+    }
+    const items = raw.datasources ?? raw.data ?? raw.items ?? []
+    return items.map(toDatasource)
   },
 
   async get(id: string): Promise<AppDatasource> {

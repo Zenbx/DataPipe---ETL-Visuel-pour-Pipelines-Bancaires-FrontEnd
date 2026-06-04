@@ -20,6 +20,7 @@ export type FieldType =
   | 'tags'        // string[]
   | 'list'        // array of objects (conditions, aggregations, mappings…)
   | 'file'        // file picker (workspace files)
+  | 'datasource'  // datasource picker (workspace datasources)
   | 'kv'          // key/value object (headers)
 
 export interface FieldDef {
@@ -105,7 +106,7 @@ export const NODE_REGISTRY: NodeDef[] = [
     icon: 'Database', description: 'Exécute une requête SQL sur une source',
     inputs: 0, outputs: 1, color: '#3b82f6',
     fields: [
-      { key: 'datasource_id', label: 'Source de données', type: 'text', placeholder: 'ds_...', help: 'ID de la datasource connectée' },
+      { key: 'datasource_id', label: 'Source de données', type: 'datasource', help: 'Datasource connectée dans le workspace' },
       { key: 'query', label: 'Requête SQL', type: 'sql', placeholder: 'SELECT * FROM transactions' },
       { key: 'limit', label: 'Limite de lignes', type: 'number', default: 1000 },
     ],
@@ -248,7 +249,7 @@ export const NODE_REGISTRY: NodeDef[] = [
     icon: 'DatabaseZap', description: 'Écrit les données dans une base SQL',
     inputs: 1, outputs: 0, color: '#ef4444',
     fields: [
-      { key: 'datasource_id', label: 'Source de données', type: 'text', placeholder: 'ds_...' },
+      { key: 'datasource_id', label: 'Source de données', type: 'datasource' },
       { key: 'table', label: 'Table', type: 'text', placeholder: 'résultats' },
       { key: 'mode', label: 'Mode', type: 'select', default: 'insert', options: [
         { value: 'insert', label: 'Insert' }, { value: 'upsert', label: 'Upsert' }, { value: 'replace', label: 'Replace' },
