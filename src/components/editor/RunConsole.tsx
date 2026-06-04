@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { useEditorStore } from '@/store/editor.store'
 import { nodesApi } from '@/lib/api/nodes'
 import { runsApi } from '@/lib/api/runs'
+import { filesApi } from '@/lib/api/files'
 import { cn } from '@/lib/utils'
 
 interface RunConsoleProps {
@@ -56,22 +57,58 @@ export function RunConsole({ height, onClose, onResize }: RunConsoleProps) {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [logs])
 
-  // Charge les données du nœud sélectionné (sortie du run si dispo, sinon test-data)
+  // Charge les données du nœud sélectionné, dans l'ordre :
+  //  1. Sortie réelle du run en cours (si run actif)
+  //  2. Aperçu du fichier source configuré (nœud CSV/JSON avec file_id)
+  //  3. Données épinglées réelles (on ignore le mock du backend)
   useEffect(() => {
     if (consoleTab === 'logs' || !selectedNodeId) { setRows([]); setDataState('idle'); return }
     let alive = true
     setDataState('loading')
+
     const load = async () => {
       try {
         let r: Record<string, unknown>[] = []
-        if (activeRunId) {
-          // Vraie sortie du run pour ce nœud
-          r = extractRows(await runsApi.getNodeOutput(activeRunId, selectedNodeId))
-        } else if (pipelineId) {
-          // Données épinglées réelles uniquement — on IGNORE le mock du backend
-          const res = (await nodesApi.getTestData(pipelineId, selectedNodeId)) as { source?: string }
-          if (res?.source !== 'mock') r = extractRows(res)
+
+        const { nodes, edges } = useEditorStore.getState()
+        const node = nodes.find((n) => n.id === selectedNodeId)
+        const cfg = (node?.data as Record<string, unknown> | undefined)?.config as Record<string, unknown> | undefined
+        const ownFileId = (cfg?.file_id as string) || ''
+
+        // Remonte les arêtes jusqu'au 1er fichier source en amont (pour transforms / sorties)
+        const findUpstreamFileId = (): string => {
+          const seen = new Set<string>()
+          let frontier = edges.filter((e) => e.target === selectedNodeId).map((e) => e.source)
+          while (frontier.length) {
+            const next: string[] = []
+            for (const id of frontier) {
+              if (seen.has(id)) continue
+              seen.add(id)
+              const up = nodes.find((n) => n.id === id)
+              const fid = ((up?.data as Record<string, unknown> | undefined)?.config as Record<string, unknown> | undefined)?.file_id as string | undefined
+              if (fid) return fid
+              next.push(...edges.filter((e) => e.target === id).map((e) => e.source))
+            }
+            frontier = next
+          }
+          return ''
         }
+
+        if (activeRunId) {
+          // 1. Vraie sortie du run pour ce nœud (réel, post-transformations)
+          r = extractRows(await runsApi.getNodeOutput(activeRunId, selectedNodeId))
+        } else {
+          // 2. Sans run : aperçu du fichier — propre au nœud, sinon celui en amont
+          const fileId = ownFileId || findUpstreamFileId()
+          if (fileId) {
+            r = (await filesApi.preview(fileId, 100)).rows
+          } else if (pipelineId) {
+            // 3. Données épinglées réelles uniquement — on IGNORE le mock du backend
+            const res = (await nodesApi.getTestData(pipelineId, selectedNodeId)) as { source?: string }
+            if (res?.source !== 'mock') r = extractRows(res)
+          }
+        }
+
         if (!alive) return
         setRows(r)
         setDataState(r.length > 0 ? 'ok' : 'empty')
