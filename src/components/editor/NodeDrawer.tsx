@@ -1,13 +1,25 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, Search, X } from 'lucide-react'
+import {
+  Plus, Search, X, Box,
+  FileText, Braces, Database, Globe, Filter, Shuffle, Sigma, GitMerge,
+  ArrowDownUp, CopyMinus, Terminal, CheckCheck, Bot, DatabaseZap, Download,
+  Webhook, Bell, Combine, Split, Clock, Table2, BarChart3,
+  type LucideIcon,
+} from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { useEditorStore } from '@/store/editor.store'
 import { useUIStore } from '@/store/ui.store'
 import { nodesApi } from '@/lib/api/nodes'
 import { NODE_REGISTRY, CATEGORY_ORDER, type NodeDef } from '@/lib/nodeRegistry'
 import { toast } from 'sonner'
+
+const ICONS: Record<string, LucideIcon> = {
+  FileText, Braces, Database, Globe, Filter, Shuffle, Sigma, GitMerge,
+  ArrowDownUp, CopyMinus, Terminal, CheckCheck, Bot, DatabaseZap, Download,
+  Webhook, Bell, Combine, Split, Clock, Table2, BarChart3,
+}
 
 interface NodeDrawerProps {
   pipelineId: string
@@ -125,7 +137,7 @@ export function NodeDrawer({ pipelineId }: NodeDrawerProps) {
       <div
         className="absolute top-0 right-0 z-10 flex flex-col"
         style={{
-          width: 264,
+          width: 300,
           height: '100%',
           background: 'var(--card)',
           borderLeft: '1px solid var(--border)',
@@ -165,24 +177,33 @@ export function NodeDrawer({ pipelineId }: NodeDrawerProps) {
           {CATEGORY_ORDER.filter((cat) => grouped[cat]?.length).map((cat) => (
             <div key={cat}>
               <p className="mb-1 px-2 text-[9px] font-bold uppercase tracking-widest text-gray-700">{cat}</p>
-              {grouped[cat].map((type) => (
-                <div
-                  key={type.slug}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, type)}
-                  onClick={() => handlePick(type)}
-                  className="group flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer transition-colors hover:bg-white/5"
-                  title={type.description}
-                >
-                  <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-gray-600 group-hover:bg-primary transition-colors" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-400 group-hover:text-foreground transition-colors truncate">
-                      {type.label}
-                    </p>
-                    <p className="text-[10px] text-gray-700 truncate">{type.description}</p>
+              {grouped[cat].map((type) => {
+                const Icon = ICONS[type.icon] ?? Box
+                return (
+                  <div
+                    key={type.slug}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, type)}
+                    onClick={() => handlePick(type)}
+                    className="group flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer transition-colors hover:bg-white/5"
+                    title={type.description}
+                  >
+                    {/* Icône du nœud, en blanc, sur une pastille sombre (visible en clair/sombre) */}
+                    <span
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                      style={{ background: 'rgba(0,0,0,0.28)' }}
+                    >
+                      <Icon className="h-4 w-4" color="#ffffff" strokeWidth={1.8} />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-400 group-hover:text-foreground transition-colors truncate">
+                        {type.label}
+                      </p>
+                      <p className="text-[10px] text-gray-700 truncate">{type.description}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ))}
         </div>
