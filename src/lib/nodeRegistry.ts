@@ -228,6 +228,46 @@ export const NODE_REGISTRY: NodeDef[] = [
     ],
   },
 
+  // ═══ Banque / Conformité ════════════════════════════════════════════════════
+  {
+    slug: 'mask_pii', label: 'Masquage RGPD', category: 'Banque', shape: 'transform',
+    icon: 'ShieldCheck', description: 'Anonymise les données personnelles (email, IBAN…) — conformité RGPD',
+    inputs: 1, outputs: 1, color: '#a855f7',
+    fields: [
+      { key: 'auto', label: 'Auto-détecter les colonnes sensibles', type: 'boolean', default: true,
+        help: 'Détecte automatiquement email, IBAN, téléphone, nom… (RGPD)' },
+      { key: 'fields', label: 'Colonnes à masquer (manuel)', type: 'list', itemLabel: 'colonne', optional: true, itemFields: [
+        { key: 'field', label: 'Colonne', type: 'text', placeholder: 'email' },
+        { key: 'strategy', label: 'Stratégie', type: 'select', default: 'hash', options: [
+          { value: 'hash', label: 'Hash (irréversible)' },
+          { value: 'mask', label: 'Masquer (****)' },
+        ]},
+      ]},
+    ],
+  },
+  {
+    slug: 'detect_anomalies', label: 'Détection anomalies', category: 'Banque', shape: 'transform',
+    icon: 'ShieldAlert', description: 'Marque les transactions suspectes (is_anomaly + raison)',
+    inputs: 1, outputs: 1, color: '#ef4444',
+    fields: [
+      { key: 'field', label: 'Colonne montant', type: 'text', default: 'montant', placeholder: 'montant' },
+      { key: 'method', label: 'Méthode', type: 'select', default: 'zscore', options: [
+        { value: 'zscore', label: 'Z-score (écart statistique)' },
+        { value: 'threshold', label: 'Seuil fixe' },
+        { value: 'negative', label: 'Montants négatifs' },
+        { value: 'all', label: 'Toutes les méthodes' },
+      ]},
+      { key: 'threshold', label: 'Seuil (méthode « seuil »)', type: 'number', optional: true, placeholder: '1000000' },
+      { key: 'z', label: 'Limite Z-score', type: 'number', default: 3, optional: true },
+    ],
+  },
+  {
+    slug: 'quality_report', label: 'Rapport qualité', category: 'Banque', shape: 'transform',
+    icon: 'BadgeCheck', description: 'Score de qualité des données (complétude, doublons, nulls)',
+    inputs: 1, outputs: 1, color: '#0d9488',
+    fields: [],
+  },
+
   // ═══ AI ═══════════════════════════════════════════════════════════════════
   {
     slug: 'ai_transform', label: 'AI Transform', category: 'AI', shape: 'ai',

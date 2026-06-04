@@ -9,6 +9,7 @@ import {
   Webhook, Bell, Combine, Split, Clock, Table2, BarChart3, Plus, Box,
   Trash2, Power, MoreHorizontal, Eye, Play, Pencil, Copy,
   Pin, PinOff, FileCode2, RefreshCw,
+  ShieldCheck, ShieldAlert, BadgeCheck,
   type LucideIcon,
 } from 'lucide-react'
 import { useEditorStore } from '@/store/editor.store'
@@ -22,6 +23,7 @@ const ICONS: Record<string, LucideIcon> = {
   FileText, Braces, Database, Globe, Filter, Shuffle, Sigma, GitMerge,
   ArrowDownUp, CopyMinus, Terminal, CheckCheck, Bot, DatabaseZap, Download,
   Webhook, Bell, Combine, Split, Clock, Table2, BarChart3,
+  ShieldCheck, ShieldAlert, BadgeCheck,
 }
 
 // Couleur caractéristique par nœud (icône + fond légèrement teinté)
@@ -34,6 +36,7 @@ const NODE_COLOR: Record<string, string> = {
   merge: '#0ea5e9', split: '#2dd4bf',
   schedule_trigger: '#22d3ee',
   table_preview: '#fbbf24', chart: '#38bdf8',
+  mask_pii: '#a855f7', detect_anomalies: '#ef4444', quality_report: '#0d9488',
 }
 
 

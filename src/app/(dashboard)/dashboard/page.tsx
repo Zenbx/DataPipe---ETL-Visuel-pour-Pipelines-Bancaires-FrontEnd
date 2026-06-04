@@ -48,7 +48,12 @@ export default function DashboardPage() {
     // L'assistant IA émet cet événement après une action -> on rafraîchit.
     const onChange = () => load()
     window.addEventListener('datapipe:pipelines-changed', onChange)
-    return () => window.removeEventListener('datapipe:pipelines-changed', onChange)
+    // Rafraîchissement auto (silencieux) : reflète les actions bot/autre onglet.
+    const poll = setInterval(load, 10000)
+    return () => {
+      window.removeEventListener('datapipe:pipelines-changed', onChange)
+      clearInterval(poll)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, workspaceLoaded])
 
