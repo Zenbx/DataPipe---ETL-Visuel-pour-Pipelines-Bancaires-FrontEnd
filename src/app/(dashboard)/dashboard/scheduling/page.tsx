@@ -46,6 +46,7 @@ export default function SchedulingPage() {
   useEffect(() => { load() }, [workspaceId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = async () => {
+    if (!workspaceId || workspaceId === 'default') return
     setIsLoading(true)
     try {
       const [sch, pls] = await Promise.all([

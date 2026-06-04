@@ -30,6 +30,7 @@ export default function RunsPage() {
   }, [pipelines])
 
   useEffect(() => {
+    if (!workspaceId || workspaceId === 'default') return
     pipelinesApi
       .list({ workspace_id: workspaceId, per_page: 50 })
       .then((res) => setPipelines(res.data))

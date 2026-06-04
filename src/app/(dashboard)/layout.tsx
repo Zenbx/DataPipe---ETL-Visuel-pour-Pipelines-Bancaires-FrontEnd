@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Navbar } from '@/components/layout/Navbar'
+import { GlobalAssistant } from '@/components/assistant/GlobalAssistant'
 import { useAuthStore } from '@/store/auth.store'
 import { getCurrentUser } from '@/lib/api/auth'
 import { initApiClient } from '@/lib/api/client'
@@ -65,6 +66,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+      {/* Assistant IA global (mode action). L'éditeur a déjà son propre panneau. */}
+      {!isEditor && <GlobalAssistant />}
     </div>
   )
 }

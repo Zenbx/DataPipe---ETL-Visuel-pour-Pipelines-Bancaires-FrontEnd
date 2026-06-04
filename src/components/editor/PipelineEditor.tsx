@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { ReactFlowProvider } from '@xyflow/react'
 import { useEditorStore } from '@/store/editor.store'
 import { pipelinesApi } from '@/lib/api/pipelines'
+import { usePipelineEvents } from '@/lib/usePipelineEvents'
 import { NODE_REGISTRY } from '@/lib/nodeRegistry'
 import { DEMO_PIPELINES_DATA } from '@/lib/demoPipelines'
 import { EditorTopBar } from './EditorTopBar'
@@ -21,6 +24,7 @@ interface PipelineEditorProps {
 }
 
 export function PipelineEditor({ pipelineId }: PipelineEditorProps) {
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [consoleHeight, setConsoleHeight] = useState(220)
 
@@ -49,7 +53,17 @@ export function PipelineEditor({ pipelineId }: PipelineEditorProps) {
         const pipeline = await pipelinesApi.get(pipelineId)
         setPipeline(pipeline)
       } catch (e) {
-        console.error(e)
+        // 403/404 = pipeline d'un autre compte ou supprimé. On ne crashe pas
+        // (pas de console.error -> pas d'overlay Next) : message clair + retour.
+        const status = (e as { status?: number })?.status
+        toast.error(
+          status === 403
+            ? "Ce pipeline appartient à un autre compte. Connecte-toi avec le bon compte."
+            : status === 404
+              ? 'Pipeline introuvable.'
+              : 'Impossible de charger le pipeline.',
+        )
+        router.replace('/dashboard/pipelines')
       } finally {
         setIsLoading(false)
       }
@@ -61,6 +75,22 @@ export function PipelineEditor({ pipelineId }: PipelineEditorProps) {
       useEditorStore.getState().resetRun()
     }
   }, [pipelineId, setPipeline, setNodeTypes])
+
+  // Temps réel : quand le BOT (ou un autre onglet) modifie/exécute le pipeline,
+  // on se redessine en direct sans recharger la page.
+  usePipelineEvents(pipelineId, (e) => {
+    if (e.type === 'pipeline.updated') {
+      pipelinesApi.get(pipelineId)
+        .then((p) => useEditorStore.getState().setPipeline(p))
+        .catch(() => {})
+    } else if (e.type === 'run.finished') {
+      const status = (e.payload?.status as string) ?? ''
+      toast.success(`Exécution ${status || 'terminée'} (via le bot)`)
+      pipelinesApi.get(pipelineId)
+        .then((p) => useEditorStore.getState().setPipeline(p))
+        .catch(() => {})
+    }
+  })
 
   if (isLoading) {
     return (

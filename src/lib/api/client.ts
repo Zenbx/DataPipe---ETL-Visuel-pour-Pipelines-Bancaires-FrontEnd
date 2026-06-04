@@ -1,4 +1,5 @@
 import { OpenAPI } from '@/lib2'
+import { setRefreshHook } from '@/lib2/_refresh'
 
 /**
  * Configuration centrale du client API généré (lib2).
@@ -30,7 +31,7 @@ export const API_BASE = `${API_ROOT}/api/v1`
  * proxifiée), celle-ci pointe directement vers le VPS.
  */
 const PUBLIC_API_ROOT = (
-  process.env.NEXT_PUBLIC_PUBLIC_API_URL ?? 'http://datapipe.duckdns.org'
+  process.env.NEXT_PUBLIC_PUBLIC_API_URL ?? ''
 ).replace(/\/+$/, '')
 export const PUBLIC_API_BASE = `${PUBLIC_API_ROOT}/api/v1`
 
@@ -42,6 +43,10 @@ let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
 OpenAPI.BASE = API_BASE
 OpenAPI.TOKEN = async () => accessToken ?? ''
+
+// Permet au client généré de rejouer une requête après un 401 (token expiré).
+// `refreshAccessToken` est hoistée (function declaration) -> référence sûre ici.
+setRefreshHook(refreshAccessToken)
 
 function persistRefresh(token: string | null) {
   if (typeof window === 'undefined') return
@@ -102,7 +107,22 @@ export const authTokens = {
  * body. On fait un fetch direct plutôt que de passer par le client généré (qui
  * injecte l'access_token).
  */
-export async function refreshAccessToken(): Promise<boolean> {
+let refreshPromise: Promise<boolean> | null = null
+
+/**
+ * Singleflight : un SEUL refresh en vol à la fois, partagé par tous les
+ * appelants concurrents. Indispensable car le backend ROTATIONNE et blackliste
+ * l'ancien refresh_token à chaque appel -> deux refresh concurrents se
+ * 401 mutuellement (et écraseraient le bon token). Déclaration `function`
+ * (hoistée) pour que `setRefreshHook(refreshAccessToken)` plus haut soit sûr.
+ */
+export function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise
+  refreshPromise = performRefresh().finally(() => { refreshPromise = null })
+  return refreshPromise
+}
+
+async function performRefresh(): Promise<boolean> {
   if (!refreshToken) refreshToken = readPersistedRefresh()
   if (!refreshToken) return false
 

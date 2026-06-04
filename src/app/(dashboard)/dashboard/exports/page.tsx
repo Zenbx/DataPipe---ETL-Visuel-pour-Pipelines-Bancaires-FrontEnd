@@ -36,6 +36,7 @@ export default function ExportsPage() {
 
   useEffect(() => {
     loadExports()
+    if (!workspaceId || workspaceId === 'default') return
     pipelinesApi.list({ workspace_id: workspaceId, per_page: 50 }).then((r) => setPipelines(r.data)).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId])

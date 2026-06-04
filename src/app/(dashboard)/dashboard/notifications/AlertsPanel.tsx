@@ -35,6 +35,7 @@ export function AlertsPanel() {
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
+    if (!workspaceId || workspaceId === 'default') { setIsLoading(false); return }
     setIsLoading(true)
     try {
       const [a, pls] = await Promise.all([

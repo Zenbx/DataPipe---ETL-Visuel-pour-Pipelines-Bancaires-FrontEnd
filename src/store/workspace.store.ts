@@ -14,6 +14,7 @@ interface WorkspaceState {
   selectWorkspace: (wsId: string) => void
   refreshOrgs: () => Promise<void>
   refreshWorkspaces: () => Promise<void>
+  reset: () => void
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -31,7 +32,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         try {
           const orgs = await orgsApi.list()
           set({ orgs })
-          const orgId = get().currentOrgId ?? orgs[0]?.id ?? null
+          // L'org persisté (localStorage) peut venir d'une AUTRE session/user :
+          // on ne le garde que s'il appartient bien aux orgs du user courant.
+          const persistedOrg = get().currentOrgId
+          const orgId = (persistedOrg && orgs.some((o) => o.id === persistedOrg))
+            ? persistedOrg
+            : (orgs[0]?.id ?? null)
           if (orgId) {
             set({ currentOrgId: orgId })
             const workspaces = await workspacesApi.list(orgId)
@@ -66,6 +72,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         if (!orgId) return
         try { set({ workspaces: await workspacesApi.list(orgId) }) } catch { /* noop */ }
       },
+
+      // Remet le store à zéro (appelé au logout / changement d'utilisateur) pour
+      // que le prochain init() reparte des orgs/workspaces du nouveau user.
+      reset: () => set({
+        orgs: [], workspaces: [], currentOrgId: null,
+        currentWorkspaceId: 'default', loaded: false,
+      }),
     }),
     {
       name: 'datapipe-workspace',
