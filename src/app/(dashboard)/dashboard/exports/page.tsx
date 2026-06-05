@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { resultsApi, type ExportItem, type ResultItem } from '@/lib/api/results'
+import { resultsApi, exportName, type ExportItem, type ResultItem } from '@/lib/api/results'
 import { pipelinesApi } from '@/lib/api/pipelines'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { formatBytes, getRelativeTime } from '@/lib/utils'
@@ -35,17 +35,33 @@ export default function ExportsPage() {
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
 
   useEffect(() => {
-    loadExports()
-    if (!workspaceId || workspaceId === 'default') return
-    pipelinesApi.list({ workspace_id: workspaceId, per_page: 50 }).then((r) => setPipelines(r.data)).catch(() => {})
+    if (!workspaceId || workspaceId === 'default') { setIsLoading(false); return }
+    let alive = true
+    setIsLoading(true)
+    ;(async () => {
+      let pipes: Pipeline[] = []
+      try {
+        const r = await pipelinesApi.list({ workspace_id: workspaceId, per_page: 50 })
+        pipes = r.data
+        if (alive) setPipelines(pipes)
+      } catch { /* ignore */ }
+      // 1. liste globale /exports ; 2. fallback : agrégation par pipeline (qui marche)
+      let list = await resultsApi.listExports()
+      if (list.length === 0 && pipes.length > 0) {
+        list = await resultsApi.listExportsAggregated(pipes.map((p) => ({ id: p.id, name: p.name })))
+      }
+      if (alive) { setExports(list); setIsLoading(false) }
+    })()
+    return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId])
 
   const loadExports = async () => {
-    setIsLoading(true)
-    try { setExports(await resultsApi.listExports()) }
-    catch { toast.error('Erreur de chargement des exports') }
-    finally { setIsLoading(false) }
+    let list = await resultsApi.listExports()
+    if (list.length === 0 && pipelines.length > 0) {
+      list = await resultsApi.listExportsAggregated(pipelines.map((p) => ({ id: p.id, name: p.name })))
+    }
+    setExports(list)
   }
 
   const loadResults = async (pipelineId: string) => {
@@ -105,14 +121,14 @@ export default function ExportsPage() {
               <Card key={e.id} className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10"><FileDown className="h-4 w-4 text-primary" /></div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground font-mono">#{e.id.slice(-8)}</p>
-                      <Badge variant="secondary" className="text-[10px] h-5 uppercase">{e.format ?? '—'}</Badge>
+                      <p className="text-sm font-medium text-foreground truncate">{exportName(e)}</p>
+                      {e.format && <Badge variant="secondary" className="text-[10px] h-5 uppercase">{e.format}</Badge>}
                       <Badge variant={statusVariant(e.status)} className="text-[10px] h-5">{e.status ?? 'inconnu'}</Badge>
                     </div>
                     <p className="text-xs text-gray-600 mt-0.5">
-                      {e.size_bytes ? `${formatBytes(e.size_bytes)} · ` : ''}{e.created_at ? getRelativeTime(e.created_at) : ''}
+                      {e.pipeline_name ? `${e.pipeline_name} · ` : ''}{e.size_bytes ? `${formatBytes(e.size_bytes)} · ` : ''}{e.created_at ? getRelativeTime(e.created_at) : ''}
                     </p>
                   </div>
                 </div>
@@ -146,8 +162,8 @@ export default function ExportsPage() {
           ) : (
             results.map((r) => (
               <Card key={r.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground font-mono">#{r.id.slice(-8)}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{r.name || `Résultat ${r.id.slice(-8)}`}</p>
                   <p className="text-xs text-gray-600 mt-0.5">
                     {r.rows != null ? `${r.rows} lignes · ` : ''}{r.created_at ? getRelativeTime(r.created_at) : ''}
                   </p>

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Zap, ArrowRight, Play, Check, Sparkles, BarChart3, LayoutGrid } from 'lucide-react'
 import Image from 'next/image'
 import { useAuthStore } from '@/store/auth.store'
-import { MiniPipeline, type MiniStep } from '@/components/marketing/MiniPipeline'
+import { MiniPipeline, MiniGraph, type MiniStep, type MiniNode, type MiniEdge } from '@/components/marketing/MiniPipeline'
 import { Poppins } from 'next/font/google'
 
 const poppins = Poppins({
@@ -515,38 +515,71 @@ function HeroCanvas() {
 // ─────────────────────────────────────────────────────────────────────────
 // Actors
 // ─────────────────────────────────────────────────────────────────────────
-interface Actor { role: string; desc: string; steps: MiniStep[] }
+interface Actor { role: string; desc: string; nodes: MiniNode[]; edges: MiniEdge[] }
 
 const ACTORS: Actor[] = [
-  { role: 'Data Analyst', desc: 'Nettoyer et analyser les ventes', steps: [
-    { slug: 'csv_reader', label: 'Ventes 2024' },
-    { slug: 'dedup',      label: 'Nettoyage' },
-    { slug: 'aggregate',  label: 'Agrégation' },
-    { slug: 'chart',      label: 'Graphique' },
+  // Data Analyst — 2 sources jointes, branche export + graphique
+  { role: 'Data Analyst', desc: 'Rapprocher ventes & retours, analyser', nodes: [
+    { id: 'v',  slug: 'csv_reader',  label: 'Ventes',     col: 0, row: 0 },
+    { id: 'r',  slug: 'csv_reader',  label: 'Retours',    col: 0, row: 1 },
+    { id: 'j',  slug: 'join',        label: 'Rapprocher', col: 1, row: 0.5 },
+    { id: 'a',  slug: 'aggregate',   label: 'Agrégation', col: 2, row: 0.5 },
+    { id: 'c',  slug: 'chart',       label: 'Graphique',  col: 3, row: 0 },
+    { id: 'e',  slug: 'file_export', label: 'Export',     col: 3, row: 1 },
+  ], edges: [
+    { from: 'v', to: 'j' }, { from: 'r', to: 'j' }, { from: 'j', to: 'a' },
+    { from: 'a', to: 'c' }, { from: 'a', to: 'e' },
   ]},
-  { role: 'BI Manager', desc: 'Consolider les KPIs multi-sources', steps: [
-    { slug: 'sql_query',   label: 'KPIs' },
-    { slug: 'join',        label: 'Join équipes' },
-    { slug: 'map',         label: 'Renommage' },
-    { slug: 'file_export', label: 'Export' },
+
+  // BI Manager — SQL + budget joints, map, double sortie (export + dashboard)
+  { role: 'BI Manager', desc: 'Consolider des KPIs multi-sources', nodes: [
+    { id: 'k', slug: 'sql_query',   label: 'KPIs SQL',   col: 0, row: 0 },
+    { id: 'b', slug: 'csv_reader',  label: 'Budget',     col: 0, row: 1 },
+    { id: 'j', slug: 'join',        label: 'Consolider', col: 1, row: 0.5 },
+    { id: 'm', slug: 'map',         label: 'Renommage',  col: 2, row: 0.5 },
+    { id: 'x', slug: 'file_export', label: 'Rapport',    col: 3, row: 0 },
+    { id: 'c', slug: 'chart',       label: 'Dashboard',  col: 3, row: 1 },
+  ], edges: [
+    { from: 'k', to: 'j' }, { from: 'b', to: 'j' }, { from: 'j', to: 'm' },
+    { from: 'm', to: 'x' }, { from: 'm', to: 'c' },
   ]},
-  { role: 'Développeur', desc: 'Transformer des payloads API', steps: [
-    { slug: 'http_request',  label: 'API Stripe' },
-    { slug: 'ai_transform',  label: 'IA Transform' },
-    { slug: 'filter',        label: 'Filtre' },
-    { slug: 'table_preview', label: 'Aperçu' },
+
+  // Développeur — API → IA → validate (2 sorties : OK / alerte)
+  { role: 'Développeur', desc: 'Transformer une API, valider, router', nodes: [
+    { id: 'h', slug: 'http_request',     label: 'API Stripe', col: 0, row: 0.5 },
+    { id: 'a', slug: 'ai_transform',     label: 'Normaliser', col: 1, row: 0.5 },
+    { id: 'v', slug: 'validate',         label: 'Valider',    col: 2, row: 0.5 },
+    { id: 'p', slug: 'table_preview',    label: 'Valides',    col: 3, row: 0 },
+    { id: 'n', slug: 'notification_send',label: 'Alerte',     col: 3, row: 1 },
+  ], edges: [
+    { from: 'h', to: 'a' }, { from: 'a', to: 'v' },
+    { from: 'v', to: 'p' }, { from: 'v', to: 'n' },
   ]},
-  { role: 'Finance', desc: 'Préparer les rapports comptables', steps: [
-    { slug: 'csv_reader',  label: 'Grand livre' },
-    { slug: 'filter',      label: 'Filtre' },
-    { slug: 'aggregate',   label: 'Somme/compte' },
-    { slug: 'file_export', label: 'Balance' },
+
+  // Finance — réconciliation banque/compta, écarts → export + notification
+  { role: 'Finance', desc: 'Réconcilier banque & comptabilité', nodes: [
+    { id: 'b', slug: 'csv_reader',       label: 'Banque',    col: 0, row: 0 },
+    { id: 'c', slug: 'csv_reader',       label: 'Compta',    col: 0, row: 1 },
+    { id: 'j', slug: 'join',             label: 'Rapprocher',col: 1, row: 0.5 },
+    { id: 'f', slug: 'filter',           label: 'Écarts',    col: 2, row: 0.5 },
+    { id: 'e', slug: 'file_export',      label: 'Balance',   col: 3, row: 0 },
+    { id: 'n', slug: 'notification_send',label: 'Notifier',  col: 3, row: 1 },
+  ], edges: [
+    { from: 'b', to: 'j' }, { from: 'c', to: 'j' }, { from: 'j', to: 'f' },
+    { from: 'f', to: 'e' }, { from: 'f', to: 'n' },
   ]},
-  { role: 'Opérations', desc: 'Surveiller les métriques livraison', steps: [
-    { slug: 'json_reader',   label: 'Webhook' },
-    { slug: 'join',          label: 'Transporteurs' },
-    { slug: 'ai_transform',  label: 'Score retards' },
-    { slug: 'chart',         label: 'Graphique' },
+
+  // Opérations — 2 sources fusionnées (merge) → score IA → graphique + webhook
+  { role: 'Opérations', desc: 'Fusionner les flux, scorer, diffuser', nodes: [
+    { id: 's', slug: 'json_reader',  label: 'Shopify',     col: 0, row: 0 },
+    { id: 't', slug: 'http_request', label: 'Transporteur',col: 0, row: 1 },
+    { id: 'm', slug: 'merge',        label: 'Fusion',      col: 1, row: 0.5 },
+    { id: 'a', slug: 'ai_transform', label: 'Score retard',col: 2, row: 0.5 },
+    { id: 'c', slug: 'chart',        label: 'Graphique',   col: 3, row: 0 },
+    { id: 'w', slug: 'webhook_send', label: 'Webhook',     col: 3, row: 1 },
+  ], edges: [
+    { from: 's', to: 'm' }, { from: 't', to: 'm' }, { from: 'm', to: 'a' },
+    { from: 'a', to: 'c' }, { from: 'a', to: 'w' },
   ]},
 ]
 
@@ -594,9 +627,9 @@ function ActorsSection() {
               <p className="mb-6 text-xs font-semibold text-gray-600 uppercase tracking-widest">
                 Pipeline · {ACTORS[active].role}
               </p>
-              {/* Vrais nœuds de l'application, reliés horizontalement */}
-              <div className="flex-1 flex items-center justify-center py-6 overflow-x-auto">
-                <MiniPipeline steps={ACTORS[active].steps} size={62} running />
+              {/* Vrais nœuds de l'application — graphe complet (branches, jointures) */}
+              <div className="flex-1 flex items-center justify-center py-4 overflow-x-auto">
+                <MiniGraph nodes={ACTORS[active].nodes} edges={ACTORS[active].edges} size={52} running />
               </div>
               <div className="mt-4 flex items-center gap-2 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" style={{ animation: 'pulse-dot 2s infinite' }} />

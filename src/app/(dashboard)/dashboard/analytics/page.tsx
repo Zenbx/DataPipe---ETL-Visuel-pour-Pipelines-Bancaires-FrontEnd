@@ -8,9 +8,31 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { analyticsApi, type TimelinePoint, type AuditLog } from '@/lib/api/analytics'
 import { aiApi } from '@/lib/api/ai'
+import { pipelinesApi } from '@/lib/api/pipelines'
+import { runsApi } from '@/lib/api/runs'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { formatNumber, getRelativeTime } from '@/lib/utils'
-import type { WorkspaceUsage, AIUsage } from '@/types'
+import type { WorkspaceUsage, AIUsage, Run } from '@/types'
+
+// Construit la timeline 30 jours à partir des runs réels (fallback si l'endpoint
+// /analytics/runs-timeline ne renvoie rien).
+function buildTimelineFromRuns(runs: Run[], days = 30): TimelinePoint[] {
+  const buckets: Record<string, { runs: number; failed: number }> = {}
+  const today = new Date()
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    buckets[d.toISOString().slice(0, 10)] = { runs: 0, failed: 0 }
+  }
+  for (const r of runs) {
+    const key = (r.started_at ?? '').slice(0, 10)
+    const b = buckets[key]
+    if (!b) continue
+    b.runs++
+    if (r.status === 'failed' || r.status === 'cancelled') b.failed++
+  }
+  return Object.entries(buckets).map(([date, v]) => ({ date, runs: v.runs, failed: v.failed }))
+}
 
 export default function AnalyticsPage() {
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
@@ -23,17 +45,34 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     setIsLoading(true)
-    Promise.all([
-      analyticsApi.getWorkspaceUsage(workspaceId, orgId ?? undefined),
-      aiApi.getUsage(),
-      analyticsApi.getRunsTimeline(workspaceId, 30).catch(() => [] as TimelinePoint[]),
-      analyticsApi.getAuditLogs({ orgId: orgId ?? undefined, page: 1 }).catch(() => [] as AuditLog[]),
-    ]).then(([u, ai, tl, logs]) => {
-      setUsage(u)
-      setAiUsage(ai)
-      setTimeline(tl)
+    let alive = true
+    ;(async () => {
+      const [u, ai, tl, logs] = await Promise.all([
+        analyticsApi.getWorkspaceUsage(workspaceId, orgId ?? undefined).catch(() => null),
+        aiApi.getUsage().catch(() => null),
+        analyticsApi.getRunsTimeline(workspaceId, 30).catch(() => [] as TimelinePoint[]),
+        analyticsApi.getAuditLogs({ orgId: orgId ?? undefined, page: 1 }).catch(() => [] as AuditLog[]),
+      ])
+      if (!alive) return
+      if (u) setUsage(u)
+      if (ai) setAiUsage(ai)
       setAudit(logs)
-    }).catch(() => {}).finally(() => setIsLoading(false))
+
+      // Timeline : si l'endpoint dédié est vide, on la reconstruit depuis les runs réels.
+      let points = tl
+      if (points.length === 0 && workspaceId && workspaceId !== 'default') {
+        try {
+          const r = await pipelinesApi.list({ workspace_id: workspaceId, per_page: 50 })
+          const ids = r.data.map((p) => p.id)
+          if (ids.length > 0) {
+            const runs = await runsApi.aggregate(ids, 30, 30)
+            points = buildTimelineFromRuns(runs, 30)
+          }
+        } catch { /* ignore */ }
+      }
+      if (alive) { setTimeline(points); setIsLoading(false) }
+    })()
+    return () => { alive = false }
   }, [workspaceId, orgId])
 
   const maxRuns = Math.max(1, ...timeline.map((t) => t.runs ?? 0))

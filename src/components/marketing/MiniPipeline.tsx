@@ -97,6 +97,61 @@ export function NodeGlyph({ slug, label, size = 64 }: { slug: string; label?: st
   )
 }
 
+// ── Graphe libre : nœuds positionnés (col/row) + arêtes arbitraires ─────────
+// Permet des pipelines complexes : branches, Join (2 entrées), Merge, Validate (2 sorties).
+export interface MiniNode { id: string; slug: string; label?: string; col: number; row: number }
+export interface MiniEdge { from: string; to: string }
+
+export function MiniGraph({ nodes, edges, size = 52, running = false }: {
+  nodes: MiniNode[]; edges: MiniEdge[]; size?: number; running?: boolean
+}) {
+  const COL_W = 148
+  const ROW_H = 100
+  const padX = size / 2 + 14
+  const padY = size / 2 + 10
+  const maxCol = Math.max(...nodes.map((n) => n.col))
+  const maxRow = Math.max(...nodes.map((n) => n.row))
+  const width = padX * 2 + maxCol * COL_W
+  const height = padY + maxRow * ROW_H + size / 2 + 26 // +26 pour le label sous le dernier rang
+
+  const center = (n: MiniNode) => ({ cx: padX + n.col * COL_W, cy: padY + n.row * ROW_H })
+  const byId: Record<string, MiniNode> = Object.fromEntries(nodes.map((n) => [n.id, n]))
+  const edgeColor = running ? '#ff6d35' : 'rgba(255,255,255,0.22)'
+
+  return (
+    <div style={{ position: 'relative', width, height, margin: '0 auto' }}>
+      {/* Arêtes (sous les nœuds) */}
+      <svg style={{ position: 'absolute', inset: 0, width, height, overflow: 'visible', pointerEvents: 'none' }}>
+        {edges.map((e, i) => {
+          const a = byId[e.from], b = byId[e.to]
+          if (!a || !b) return null
+          const s = center(a), t = center(b)
+          const sx = s.cx + size / 2, sy = s.cy
+          const tx = t.cx - size / 2, ty = t.cy
+          const dx = Math.max(28, (tx - sx) / 2)
+          const path = `M ${sx} ${sy} C ${sx + dx} ${sy}, ${tx - dx} ${ty}, ${tx} ${ty}`
+          return (
+            <g key={i}>
+              <path d={path} fill="none" stroke={edgeColor} strokeWidth={1.6} />
+              <path d={`M ${tx - 6} ${ty - 4} L ${tx} ${ty} L ${tx - 6} ${ty + 4} Z`} fill={edgeColor} />
+            </g>
+          )
+        })}
+      </svg>
+
+      {/* Nœuds (forme centrée sur (cx,cy), label dessous) */}
+      {nodes.map((n) => {
+        const { cx, cy } = center(n)
+        return (
+          <div key={n.id} style={{ position: 'absolute', left: cx, top: cy - size / 2, transform: 'translateX(-50%)' }}>
+            <NodeGlyph slug={n.slug} label={n.label} size={size} />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Pipeline horizontal : glyphes reliés par des connecteurs + flèche ────────
 export interface MiniStep { slug: string; label?: string }
 

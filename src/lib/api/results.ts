@@ -2,6 +2,9 @@ import { ResultsService } from '@/lib2'
 
 export type ExportItem = {
   id: string
+  name?: string
+  filename?: string
+  pipeline_name?: string
   format?: string
   status?: string
   size_bytes?: number
@@ -14,9 +17,16 @@ export type ResultItem = {
   id: string
   run_id?: string
   pipeline_id?: string
+  pipeline_name?: string
+  name?: string
   rows?: number
   created_at?: string
   node_id?: string
+}
+
+/** Nom lisible d'un export : nom donné > fichier > pipeline > id court. */
+export function exportName(e: ExportItem): string {
+  return e.name || e.filename || e.pipeline_name || `Export ${e.id.slice(-8)}`
 }
 
 function triggerDownload(raw: unknown, fallbackName: string) {
@@ -37,8 +47,41 @@ function triggerDownload(raw: unknown, fallbackName: string) {
 
 export const resultsApi = {
   async listExports(): Promise<ExportItem[]> {
-    const raw = (await ResultsService.getExports()) as { exports?: ExportItem[]; data?: ExportItem[] }
-    return raw.exports ?? raw.data ?? []
+    try {
+      const raw = (await ResultsService.getExports()) as { exports?: ExportItem[]; data?: ExportItem[] }
+      return raw.exports ?? raw.data ?? []
+    } catch {
+      // Le backend n'expose pas (ou pas encore) la liste globale /exports → 404.
+      // On retombe gracieusement sur du vide ; le fallback par pipeline prend le relais.
+      return []
+    }
+  },
+
+  /**
+   * Liste consolidée des exports/sorties en agrégeant les résultats de chaque
+   * pipeline (endpoint /pipelines/{id}/results, lui, fonctionne). Sert de
+   * source quand la liste globale /exports n'est pas disponible.
+   */
+  async listExportsAggregated(pipelines: { id: string; name: string }[]): Promise<ExportItem[]> {
+    const all = await Promise.all(
+      pipelines.map(async (p) => {
+        try {
+          const results = await resultsApi.getPipelineResults(p.id)
+          return results.map((r): ExportItem => ({
+            id: r.id,
+            name: r.name || p.name,
+            pipeline_name: p.name,
+            result_id: r.id,
+            status: 'ready',
+            created_at: r.created_at,
+            size_bytes: undefined,
+          }))
+        } catch {
+          return [] as ExportItem[]
+        }
+      }),
+    )
+    return all.flat().sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
   },
 
   async getExport(id: string) {
