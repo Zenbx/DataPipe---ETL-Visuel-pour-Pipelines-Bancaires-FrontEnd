@@ -1,0 +1,75 @@
+import type { TranslationKey } from './fr'
+
+// Dictionnaire EN — typé sur les mêmes clés que FR (toute clé manquante = erreur de type).
+export const en: Record<TranslationKey, string> = {
+  // Common
+  'common.save': 'Save',
+  'common.saving': 'Saving…',
+  'common.cancel': 'Cancel',
+  'common.delete': 'Delete',
+  'common.create': 'Create',
+  'common.edit': 'Edit',
+  'common.close': 'Close',
+  'common.confirm': 'Confirm',
+  'common.search': 'Search…',
+  'common.loading': 'Loading…',
+  'common.retry': 'Retry',
+  'common.download': 'Download',
+  'common.optional': 'optional',
+  'common.none': 'None',
+  'common.yes': 'Yes',
+  'common.no': 'No',
+
+  // Navigation
+  'nav.dashboard': 'Dashboard',
+  'nav.pipelines': 'Pipelines',
+  'nav.runs': 'Runs',
+  'nav.files': 'Files',
+  'nav.datasources': 'Sources',
+  'nav.transform': 'SQL',
+  'nav.aiTools': 'AI Tools',
+  'nav.analytics': 'Analytics',
+  'nav.marketplace': 'Marketplace',
+  'nav.notifications': 'Notifications',
+  'nav.exports': 'Exports',
+  'nav.templates': 'Templates',
+  'nav.scheduling': 'Scheduling',
+  'nav.webhooks': 'Webhooks',
+  'nav.status': 'Status',
+  'nav.team': 'Team',
+  'nav.apiKeys': 'API Keys',
+  'nav.integrations': 'Integrations',
+  'nav.settings': 'Settings',
+  'nav.apiConnected': 'API connected',
+
+  // Editor
+  'editor.run': 'Run',
+  'editor.stop': 'Stop',
+  'editor.addNode': 'Add your node',
+  'editor.addNodeTitle': 'Add a node',
+  'editor.connectNode': 'Connect a node',
+  'editor.logs': 'Logs',
+  'editor.data': 'Data',
+  'editor.schema': 'Schema',
+  'editor.fitView': 'Fit view',
+  'editor.zoomIn': 'Zoom in',
+  'editor.zoomOut': 'Zoom out',
+  'editor.tidy': 'Tidy up nodes',
+  'editor.lock': 'Lock canvas',
+  'editor.unlock': 'Unlock canvas',
+  'editor.assistant': 'AI Assistant',
+
+  // Pipelines
+  'pipelines.title': 'Pipelines',
+  'pipelines.new': 'New pipeline',
+  'pipelines.name': 'Pipeline name',
+  'pipelines.description': 'Description',
+  'pipelines.createAndOpen': 'Create and open',
+  'pipelines.empty': 'No pipeline',
+  'pipelines.emptyHint': 'Create your first pipeline to get started',
+
+  // Theme / language
+  'theme.dark': 'Dark theme',
+  'theme.light': 'Light theme',
+  'lang.label': 'Language',
+}

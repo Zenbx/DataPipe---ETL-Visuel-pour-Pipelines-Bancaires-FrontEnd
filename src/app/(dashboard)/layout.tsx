@@ -10,6 +10,8 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { getCurrentUser } from '@/lib/api/auth'
 import { initApiClient } from '@/lib/api/client'
 import { Skeleton } from '@/components/ui/skeleton'
+import { WelcomeWizard } from '@/components/onboarding/WelcomeWizard'
+import { OnboardingTracker } from '@/components/onboarding/OnboardingTracker'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -80,6 +82,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
       {/* Assistant IA global (mode action). L'éditeur a déjà son propre panneau. */}
       {!isEditor && <GlobalAssistant />}
+      {!isEditor && <WelcomeWizard />}
+      {!isEditor && <OnboardingTracker />}
     </div>
   )
 }

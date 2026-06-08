@@ -18,8 +18,9 @@ import { PUBLIC_API_BASE } from '@/lib/api/client'
 import { getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Pipeline } from '@/types'
-
-const ALL_EVENTS: WebhookEvent[] = ['run.success', 'run.error', 'run.started', 'run.cancelled']
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
+import { WebhookEventBadge, WebhookEventSelector } from '@/components/webhooks/WebhookEventSelector'
+import { WebhookEventHistoryView } from '@/components/webhooks/WebhookEventHistoryView'
 
 export default function WebhooksPage() {
   const [webhooks, setWebhooks] = useState<AppWebhook[]>([])
@@ -68,11 +69,9 @@ export default function WebhooksPage() {
     try { await webhooksApi.get(w.pipeline_id, w.id) } catch { /* détail optionnel */ }
   }
 
-  const toggleEvent = (e: WebhookEvent) =>
-    setForm((f) => ({ ...f, events: f.events.includes(e) ? f.events.filter((x) => x !== e) : [...f.events, e] }))
-
   const handleSubmit = async () => {
     if (!form.pipelineId || !form.url.trim()) { toast.error('Pipeline et URL requis'); return }
+    if (form.events.length === 0) { toast.error('Sélectionnez au moins un événement'); return }
     setBusy(true)
     try {
       if (editing) {
@@ -116,15 +115,15 @@ export default function WebhooksPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-4xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Webhooks</h1>
-          <p className="text-sm text-gray-500">{webhooks.length} webhook{webhooks.length > 1 ? 's' : ''}</p>
-        </div>
+    <DashboardPageShell
+      helpKey="webhooks"
+      width="default"
+      title="Webhooks"
+      description={`${webhooks.length} webhook${webhooks.length > 1 ? 's' : ''}`}
+      actions={(
         <Button className="gap-2" onClick={openCreate}><Plus className="h-4 w-4" /> Nouveau webhook</Button>
-      </div>
-
+      )}
+    >
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : webhooks.length === 0 ? (
@@ -158,7 +157,7 @@ export default function WebhooksPage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 pl-12">
-                {w.events.map((e) => <Badge key={e} variant="secondary" className="text-[10px] h-5">{e}</Badge>)}
+                {w.events.map((e) => <WebhookEventBadge key={e} eventId={e} />)}
                 {w.inbound_token && (
                   <div className="ml-auto flex items-center gap-1">
                     <Button variant="ghost" size="sm" className="h-6 gap-1 text-[11px]" onClick={() => copyInbound(w)}><Copy className="h-3 w-3" /> URL entrante</Button>
@@ -173,7 +172,7 @@ export default function WebhooksPage() {
 
       {/* Form */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? 'Modifier le webhook' : 'Nouveau webhook'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-1">
             <div className="space-y-1.5">
@@ -190,14 +189,11 @@ export default function WebhooksPage() {
               <Input placeholder="https://exemple.com/hook" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>Événements</Label>
-              <div className="flex flex-wrap gap-2">
-                {ALL_EVENTS.map((e) => (
-                  <button key={e} onClick={() => toggleEvent(e)} className={`rounded-full px-3 py-1 text-xs border transition-colors ${form.events.includes(e) ? 'border-primary bg-primary/15 text-primary' : 'border-border text-gray-500 hover:border-[#3a3a3a]'}`}>
-                    {e}
-                  </button>
-                ))}
-              </div>
+              <Label>Événements déclencheurs</Label>
+              <WebhookEventSelector
+                value={form.events}
+                onChange={(events) => setForm({ ...form, events })}
+              />
             </div>
             {editing && (
               <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
@@ -218,10 +214,10 @@ export default function WebhooksPage() {
         <DialogContent className="max-w-xl">
           <DialogHeader><DialogTitle>Historique des événements</DialogTitle></DialogHeader>
           {events == null ? <Skeleton className="h-32" /> : (
-            <pre className="max-h-[55vh] overflow-auto rounded-lg bg-background p-3 text-xs text-gray-300 font-mono">{JSON.stringify(events, null, 2)}</pre>
+            <WebhookEventHistoryView data={events} webhookUrl={eventsFor?.url} />
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPageShell>
   )
 }

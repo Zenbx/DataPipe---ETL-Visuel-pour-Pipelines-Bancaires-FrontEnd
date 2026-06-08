@@ -16,8 +16,9 @@ import { useEditorStore } from '@/store/editor.store'
 import { pipelinesApi } from '@/lib/api/pipelines'
 import { runsApi } from '@/lib/api/runs'
 import { nodesApi } from '@/lib/api/nodes'
-import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses, computeExecutionOrder } from '@/lib/runWatcher'
+import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses, computeExecutionOrder, applyRunLogs } from '@/lib/runWatcher'
 import { toast } from 'sonner'
+import { emitOnboardingEvent } from '@/components/onboarding/OnboardingTracker'
 import { cn } from '@/lib/utils'
 
 interface EditorTopBarProps {
@@ -71,28 +72,36 @@ export function EditorTopBar({ pipelineId }: EditorTopBarProps) {
       const run = await runsApi.run(pipelineId)
       stopWatchRef.current?.()
       setActiveRun(run.id)
-      setRunStatus('running')
       setConsoleOpen(true)
 
-      const { nodes: ns, edges: es } = useEditorStore.getState()
-      stopWatchRef.current = watchRun({
-        pipelineId,
-        runId: run.id,
-        executionOrder: computeExecutionOrder(ns, es),
-        onLog: (log) => appendLog(log),
-        onNodeStatus: (nodeId, status) => setNodeStatus(nodeId, status),
-        onComplete: (status) => {
-          finalizeRunNodeStatuses(
-            useEditorStore.getState().nodeStatuses,
-            status,
-            setNodeStatus,
-          )
-          setRunStatus(status)
-          toast[status === 'success' ? 'success' : 'error'](
-            status === 'success' ? 'Run terminé avec succès' : 'Run terminé avec erreurs',
-          )
-        },
-      })
+      if (run.status === 'running' || run.status === 'queued') {
+        setRunStatus('running')
+        const { nodes: ns, edges: es } = useEditorStore.getState()
+        stopWatchRef.current = watchRun({
+          pipelineId,
+          runId: run.id,
+          executionOrder: computeExecutionOrder(ns, es),
+          onLog: (log) => appendLog(log),
+          onNodeStatus: (nodeId, status) => setNodeStatus(nodeId, status),
+          onComplete: (status) => {
+            finalizeRunNodeStatuses(useEditorStore.getState().nodeStatuses, status, setNodeStatus)
+            setRunStatus(status)
+            if (status === 'success') emitOnboardingEvent('datapipe:run-completed')
+            toast[status === 'success' ? 'success' : 'error'](
+              status === 'success' ? 'Run terminé avec succès' : 'Run terminé avec erreurs',
+            )
+          },
+        })
+      } else {
+        // Run synchrone : on lit directement les logs du run terminé.
+        const logs = await runsApi.getLogs(run.id).catch(() => [])
+        applyRunLogs(logs, run.status, (l) => appendLog(l), (nid, st) => setNodeStatus(nid, st))
+        setRunStatus(run.status)
+        if (run.status === 'success') emitOnboardingEvent('datapipe:run-completed')
+        toast[run.status === 'success' ? 'success' : 'error'](
+          run.status === 'success' ? 'Run terminé avec succès' : 'Run terminé avec erreurs',
+        )
+      }
     } catch {
       toast.error('Erreur lors du lancement')
     }

@@ -1,19 +1,46 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Mail } from 'lucide-react'
 import Image from 'next/image'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { forgotPassword } from '@/lib/api/auth'
 import { toast } from 'sonner'
+import { AuthGlassCard, AuthPageShell } from '@/components/auth/AuthPageShell'
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  height: 42,
+  padding: '0 14px',
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.09)',
+  borderRadius: 10,
+  color: '#f0f0f0',
+  fontSize: 13,
+  fontFamily: 'inherit',
+  outline: 'none',
+  transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
+}
+
+const onFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+  e.currentTarget.style.borderColor = '#ff6d35'
+  e.currentTarget.style.background = 'rgba(255,109,53,0.04)'
+  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255,109,53,0.12)'
+}
+
+const onBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'
+  e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+  e.currentTarget.style.boxShadow = 'none'
+}
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setTimeout(() => setMounted(true), 80) }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,43 +57,101 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0a0a0a] p-4">
-      <div className="mb-8 flex items-center gap-3">
-        <Image src="/logo.png" alt="DataPipe" width={56} height={56} className="rounded-xl" />
-        <span className="text-xl font-bold tracking-tight text-gray-100">DataPipe</span>
-      </div>
+    <AuthPageShell>
+      <AuthGlassCard mounted={mounted}>
+        <div style={{ marginBottom: 28 }}>
+          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+            <Image src="/logo.png" alt="DataPipe" width={52} height={52} style={{ borderRadius: 9 }} />
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#f0f0f0', letterSpacing: '-0.2px' }}>DataPipe</span>
+          </Link>
+        </div>
 
-      <div className="w-full max-w-sm rounded-xl border border-[#1e1e1e] bg-[#111111] p-8 shadow-xl">
         {sent ? (
-          <div className="text-center space-y-4">
-            <div className="text-4xl">📧</div>
-            <h1 className="text-xl font-semibold text-gray-100">Email envoyé !</h1>
-            <p className="text-sm text-gray-500">Vérifiez votre boîte mail et cliquez sur le lien de réinitialisation.</p>
-            <Link href="/login">
-              <Button variant="outline" className="w-full mt-4 gap-2">
-                <ArrowLeft className="h-4 w-4" /> Retour à la connexion
-              </Button>
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: 18,
+              background: 'rgba(59,130,246,0.12)',
+              border: '1px solid rgba(59,130,246,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Mail style={{ width: 28, height: 28, color: '#3b82f6' }} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: 24, fontWeight: 200, color: '#f5f5f5', letterSpacing: '-0.4px', marginBottom: 8 }}>
+                Email envoyé !
+              </h1>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>
+                Vérifiez votre boîte mail et cliquez sur le lien de réinitialisation.
+              </p>
+            </div>
+            <Link href="/login" style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', height: 44,
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.09)',
+              borderRadius: 11, color: 'rgba(255,255,255,0.7)',
+              fontSize: 14, fontWeight: 500, textDecoration: 'none',
+              transition: 'all 0.15s',
+            }}>
+              <ArrowLeft style={{ width: 15, height: 15 }} /> Retour à la connexion
             </Link>
           </div>
         ) : (
           <>
-            <h1 className="mb-1 text-xl font-semibold text-gray-100">Mot de passe oublié</h1>
-            <p className="mb-6 text-sm text-gray-500">Entrez votre email pour recevoir un lien de réinitialisation</p>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="john@acme.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <div style={{ marginBottom: 24 }}>
+              <h1 style={{ fontSize: 24, fontWeight: 200, color: '#f5f5f5', letterSpacing: '-0.5px', marginBottom: 6 }}>
+                Mot de passe oublié
+              </h1>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.32)', lineHeight: 1.5 }}>
+                Entrez votre email pour recevoir un lien de réinitialisation.
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>
+                  Adresse email
+                </label>
+                <input
+                  type="email"
+                  placeholder="vous@acme.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                  style={inputStyle}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
+                />
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Envoi…' : 'Envoyer le lien'}
-              </Button>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                style={{
+                  height: 44, width: '100%',
+                  background: isLoading ? 'rgba(255,109,53,0.5)' : '#ff6d35',
+                  border: 'none', borderRadius: 11,
+                  color: '#fff', fontSize: 14, fontWeight: 200, fontFamily: 'inherit',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: isLoading ? 'none' : '0 4px 24px rgba(255,109,53,0.28)',
+                }}
+              >
+                {isLoading ? 'Envoi…' : <>Envoyer le lien <ArrowRight style={{ width: 15, height: 15 }} /></>}
+              </button>
             </form>
-            <Link href="/login" className="mt-4 flex items-center justify-center gap-1.5 text-sm text-gray-600 hover:text-gray-400">
-              <ArrowLeft className="h-3.5 w-3.5" /> Retour
+
+            <Link href="/login" style={{
+              marginTop: 20,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              fontSize: 13, color: 'rgba(255,255,255,0.28)', textDecoration: 'none',
+            }}>
+              <ArrowLeft style={{ width: 14, height: 14 }} /> Retour
             </Link>
           </>
         )}
-      </div>
-    </div>
+      </AuthGlassCard>
+    </AuthPageShell>
   )
 }

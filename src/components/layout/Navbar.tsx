@@ -15,6 +15,7 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useNotificationStore } from '@/store/notification.store'
 import { logout as logoutRequest } from '@/lib/api/auth'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher'
+import { HelpMenu } from '@/components/help/HelpMenu'
 import { toast } from 'sonner'
 
 interface NavbarProps {
@@ -50,6 +51,8 @@ export function Navbar({ title }: NavbarProps) {
 
       {/* Right */}
       <div className="flex items-center gap-2">
+        <HelpMenu />
+
         {/* Notifications */}
         <Button
           variant="ghost"

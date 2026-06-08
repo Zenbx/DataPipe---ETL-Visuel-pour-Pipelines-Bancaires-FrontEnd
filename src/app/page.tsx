@@ -6,7 +6,9 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Zap, ArrowRight, Play, Check, Sparkles, BarChart3, LayoutGrid } from 'lucide-react'
 import Image from 'next/image'
 import { useAuthStore } from '@/store/auth.store'
-import { MiniPipeline, MiniGraph, type MiniStep, type MiniNode, type MiniEdge } from '@/components/marketing/MiniPipeline'
+import { MiniPipeline, MiniGraph, NodeGlyph, type MiniStep, type MiniNode, type MiniEdge } from '@/components/marketing/MiniPipeline'
+import { NODE_REGISTRY, CATEGORY_ORDER } from '@/lib/nodeRegistry'
+import { BentoCanvasAnimation } from '@/components/marketing/BentoCanvasAnimation'
 import { Poppins } from 'next/font/google'
 
 const poppins = Poppins({
@@ -318,29 +320,13 @@ function BentoGrid() {
         {/* Big card — canvas */}
         <Reveal delay={0} className="col-span-2 row-span-2">
           <TiltCard
-            className="h-full min-h-[280px] overflow-hidden rounded-2xl p-6"
+            className="relative h-full min-h-[320px] overflow-hidden rounded-2xl p-6 flex flex-col"
             style={{ background: '#0f0f13', border: '1px solid rgba(255,255,255,0.07)' }}
           >
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700 mb-3">Canvas visuel</p>
             <h3 className="text-lg font-bold text-white mb-1">Glisser-déposer</h3>
-            <p className="text-sm text-gray-500 mb-6">Construisez en temps réel, voyez l&apos;exécution se propager.</p>
-            <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 space-y-2">
-              {[
-                { label: 'CSV Import', color: '#00e5a0', sub: '1 247 lignes' },
-                { label: 'Filtre',     color: '#ff6d35', sub: 'montant > 500' },
-                { label: 'Export',     color: '#ff6d35', sub: 'rapport.csv' },
-              ].map((n, i) => (
-                <div key={i}>
-                  <div className="flex items-center gap-2.5 rounded-xl border px-3 py-2 transition-colors hover:bg-white/4"
-                    style={{ borderColor: n.color + '30', background: n.color + '0a' }}>
-                    <div className="h-1.5 w-1.5 rounded-full" style={{ background: n.color }} />
-                    <span className="text-xs font-semibold" style={{ color: n.color }}>{n.label}</span>
-                    <span className="ml-auto text-[10px] text-gray-700 font-mono">{n.sub}</span>
-                  </div>
-                  {i < 2 && <div className="ml-5 h-3 w-px bg-[#2a2a2a]" />}
-                </div>
-              ))}
-            </div>
+            <p className="text-sm text-gray-500 mb-3">Pipeline bancaire : relevé → RGPD → anomalies → export.</p>
+            <BentoCanvasAnimation />
           </TiltCard>
         </Reveal>
 
@@ -935,46 +921,64 @@ function StickyFeatures() {
 // ─────────────────────────────────────────────────────────────────────────
 // Nodes
 // ─────────────────────────────────────────────────────────────────────────
-const NODE_LIST = [
-  { label: 'CSV Import',    cat: 'Source',    c: '#00e5a0' },
-  { label: 'JSON Loader',   cat: 'Source',    c: '#00e5a0' },
-  { label: 'SQL Query',     cat: 'Source',    c: '#00e5a0' },
-  { label: 'Filtre',        cat: 'Transform', c: '#ff6d35' },
-  { label: 'Join',          cat: 'Transform', c: '#ff6d35' },
-  { label: 'Agrégation',    cat: 'Transform', c: '#ff6d35' },
-  { label: 'Rename',        cat: 'Transform', c: '#ff6d35' },
-  { label: 'Nettoyage',     cat: 'Transform', c: '#ff6d35' },
-  { label: 'IA Transform',  cat: 'IA',        c: '#ff6d35' },
-  { label: 'Table Preview', cat: 'Output',    c: '#ff6d35' },
-  { label: 'Chart',         cat: 'Output',    c: '#ff6d35' },
-  { label: 'Export',        cat: 'Output',    c: '#ff6d35' },
-]
+const CATEGORY_LABELS: Record<string, string> = {
+  Input: 'Entrées',
+  Transform: 'Transformations',
+  Banque: 'Banque & conformité',
+  AI: 'Intelligence artificielle',
+  Output: 'Sorties',
+  Control: 'Contrôle',
+  Trigger: 'Déclencheurs',
+  Visualisation: 'Visualisation',
+}
+
+const NODES_BY_CATEGORY = CATEGORY_ORDER.map((cat) => ({
+  key: cat,
+  label: CATEGORY_LABELS[cat] ?? cat,
+  nodes: NODE_REGISTRY.filter((n) => n.category === cat),
+})).filter((g) => g.nodes.length > 0)
 
 function NodesSection() {
+  const total = NODE_REGISTRY.length
+
   return (
     <section className="border-t py-24" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-      <div className="mx-auto max-w-5xl px-6">
+      <div className="mx-auto max-w-6xl px-6">
         <Reveal className="mb-12">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#ff6d35] mb-3">12 nœuds</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#ff6d35] mb-3">
+            {total} nœuds
+          </p>
           <h2 className="text-3xl font-light text-white">Tout pour vos pipelines.</h2>
+          <p className="mt-3 text-sm text-gray-500 max-w-xl">
+            Les mêmes glyphes que dans l&apos;éditeur — formes, icônes et couleurs par type de nœud.
+          </p>
         </Reveal>
-        <Reveal delay={80}>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-            {NODE_LIST.map((n, i) => (
-              <div key={i}
-                className="flex items-center gap-3 rounded-xl px-4 py-3 cursor-default transition-all duration-150 hover:-translate-y-0.5 group"
-                style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}
-              >
-                <div className="h-2 w-2 shrink-0 rounded-full transition-all duration-200 group-hover:scale-125"
-                  style={{ background: n.c, boxShadow: `0 0 6px ${n.c}60` }} />
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-gray-300 truncate group-hover:text-white transition-colors">{n.label}</p>
-                  <p className="text-[10px] text-gray-700">{n.cat}</p>
-                </div>
+
+        <div className="space-y-10">
+          {NODES_BY_CATEGORY.map((group, gi) => (
+            <Reveal key={group.key} delay={gi * 50}>
+              <div className="flex items-center gap-3 mb-4">
+                <h3 className="text-sm font-semibold text-gray-300">{group.label}</h3>
+                <span className="text-[10px] text-gray-600 font-mono">{group.nodes.length}</span>
+                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
               </div>
-            ))}
-          </div>
-        </Reveal>
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                {group.nodes.map((node) => (
+                  <div
+                    key={node.slug}
+                    className="flex flex-col items-center gap-2 rounded-xl px-2 py-4 transition-all duration-150 hover:-translate-y-0.5 group"
+                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+                  >
+                    <NodeGlyph slug={node.slug} size={46} label="" />
+                    <p className="text-[10px] font-medium text-gray-500 text-center leading-tight px-1 group-hover:text-gray-300 transition-colors">
+                      {node.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+          ))}
+        </div>
       </div>
     </section>
   )

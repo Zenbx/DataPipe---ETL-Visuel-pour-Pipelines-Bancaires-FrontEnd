@@ -3,7 +3,7 @@
 import {
   FileText, Braces, Database, Globe, Filter, Shuffle, Sigma, GitMerge,
   ArrowDownUp, CopyMinus, Terminal, CheckCheck, Bot, DatabaseZap, Download,
-  Webhook, Bell, Combine, Split, Clock, Table2, BarChart3, Box,
+  Webhook, Bell, Combine, Split, Clock, Table2, BarChart3, Box, ShieldAlert, ShieldCheck,
   type LucideIcon,
 } from 'lucide-react'
 import { NODE_REGISTRY_MAP, type NodeShape } from '@/lib/nodeRegistry'
@@ -12,7 +12,7 @@ import { NODE_REGISTRY_MAP, type NodeShape } from '@/lib/nodeRegistry'
 const ICONS: Record<string, LucideIcon> = {
   FileText, Braces, Database, Globe, Filter, Shuffle, Sigma, GitMerge,
   ArrowDownUp, CopyMinus, Terminal, CheckCheck, Bot, DatabaseZap, Download,
-  Webhook, Bell, Combine, Split, Clock, Table2, BarChart3,
+  Webhook, Bell, Combine, Split, Clock, Table2, BarChart3, ShieldAlert, ShieldCheck,
 }
 
 export const NODE_COLOR: Record<string, string> = {
@@ -24,6 +24,7 @@ export const NODE_COLOR: Record<string, string> = {
   merge: '#0ea5e9', split: '#2dd4bf',
   schedule_trigger: '#22d3ee',
   table_preview: '#fbbf24', chart: '#38bdf8',
+  mask_pii: '#a855f7', detect_anomalies: '#ef4444', quality_report: '#0d9488',
 }
 
 function polyPoints(shape: NodeShape, W: number, M: number): number[][] | null {
@@ -64,7 +65,14 @@ function cssRadius(shape: NodeShape, size: number): string {
 }
 
 // ── Glyphe de nœud (forme + icône colorée), identique au visuel éditeur ──────
-export function NodeGlyph({ slug, label, size = 64 }: { slug: string; label?: string; size?: number }) {
+export function NodeGlyph({
+  slug, label, size = 64, borderColor = 'rgba(255,255,255,0.14)',
+}: {
+  slug: string
+  label?: string
+  size?: number
+  borderColor?: string
+}) {
   const def = NODE_REGISTRY_MAP[slug]
   const Icon = (def && ICONS[def.icon]) ?? Box
   const shape = (def?.shape ?? 'transform') as NodeShape
@@ -81,10 +89,10 @@ export function NodeGlyph({ slug, label, size = 64 }: { slug: string; label?: st
       <div style={{ position: 'relative', width: size, height: size }}>
         {poly ? (
           <svg width={size} height={size} style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
-            <path d={roundedPath(poly, radius)} fill="#0f0f14" stroke="rgba(255,255,255,0.14)" strokeWidth={1.25} strokeLinejoin="round" />
+            <path d={roundedPath(poly, radius)} fill="#0f0f14" stroke={borderColor} strokeWidth={1.8} strokeLinejoin="round" style={{ transition: 'stroke 0.25s ease' }} />
           </svg>
         ) : (
-          <div style={{ position: 'absolute', inset: 0, borderRadius: cssRadius(shape, size), background: '#0f0f14', border: '1.25px solid rgba(255,255,255,0.14)' }} />
+          <div style={{ position: 'absolute', inset: 0, borderRadius: cssRadius(shape, size), background: '#0f0f14', border: `1.8px solid ${borderColor}`, transition: 'border-color 0.25s ease' }} />
         )}
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon size={Math.round(size * 0.36)} strokeWidth={1.7} color={color} />

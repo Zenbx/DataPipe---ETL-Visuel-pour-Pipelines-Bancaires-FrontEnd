@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { runsApi } from '@/lib/api/runs'
+import { nodesApi } from '@/lib/api/nodes'
 import { formatDuration, getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { LogEntry, Run } from '@/types'
@@ -32,6 +33,7 @@ export function RunDetailDialog({
   const [isLoading, setIsLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [nodeOutput, setNodeOutput] = useState<{ nodeId: string; data: unknown } | null>(null)
+  const [nodeNames, setNodeNames] = useState<Record<string, string>>({})
   const stopRef = useRef<(() => void) | null>(null)
   const logEndRef = useRef<HTMLDivElement>(null)
 
@@ -45,6 +47,18 @@ export function RunDetailDialog({
       .then(setLogs)
       .catch(() => {})
       .finally(() => setIsLoading(false))
+
+    // Map id → label des nœuds, pour afficher les noms (pas les ID).
+    nodesApi.listNodes(run.pipeline_id)
+      .then((ns) => {
+        const map: Record<string, string> = {}
+        for (const n of ns) {
+          const d = n.data as Record<string, unknown> | undefined
+          map[n.id] = (d?.label as string) || (n as { label?: string }).label || n.id.slice(0, 8)
+        }
+        setNodeNames(map)
+      })
+      .catch(() => setNodeNames({}))
 
     // Stream en direct pour les runs en cours.
     if (run.status === 'running' || run.status === 'queued') {
@@ -127,7 +141,7 @@ export function RunDetailDialog({
                       onClick={() => loadNodeOutput(id)}
                       className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${nodeOutput?.nodeId === id ? 'border-primary bg-primary/15 text-primary' : 'border-border text-gray-500 hover:border-[#3a3a3a]'}`}
                     >
-                      {id.slice(0, 8)}
+                      {nodeNames[id] ?? id.slice(0, 8)}
                     </button>
                   ))}
                 </div>

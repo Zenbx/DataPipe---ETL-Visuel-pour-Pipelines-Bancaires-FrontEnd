@@ -183,6 +183,32 @@ export function finalizeRunNodeStatuses(
 }
 
 /**
+ * Run SYNCHRONE : le backend exécute le pipeline en bloc et renvoie un run déjà
+ * terminé. On lit alors directement les logs du run (déjà persistés), on les
+ * affiche, et on en dérive le statut final de chaque nœud — sans streaming.
+ */
+export function applyRunLogs(
+  logs: LogEntry[],
+  runStatus: RunStatus,
+  onLog: (log: LogEntry) => void,
+  onNodeStatus: (nodeId: string, status: NodeStatus) => void,
+) {
+  const perNode: Record<string, NodeStatus> = {}
+  for (const log of logs) {
+    onLog(log)
+    if (!log.node_id) continue
+    if (log.level === 'ERROR') perNode[log.node_id] = 'error'
+    else if (!perNode[log.node_id]) perNode[log.node_id] = 'success'
+  }
+  // Si le run a échoué globalement, les nœuds sans verdict restent neutres ;
+  // ceux marqués error le restent. Sinon, tout ce qui a loggué = succès.
+  const fallback = mapRunEndStatus(runStatus)
+  for (const [id, st] of Object.entries(perNode)) {
+    onNodeStatus(id, st === 'error' ? 'error' : (fallback === 'error' ? 'success' : st))
+  }
+}
+
+/**
  * Surveille un run : SSE + polling de secours (le proxy Next.js bufferise
  * souvent le SSE) + récupération finale des logs.
  */

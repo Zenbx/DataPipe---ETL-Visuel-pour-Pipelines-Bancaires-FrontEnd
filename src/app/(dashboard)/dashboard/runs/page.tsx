@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import type { Pipeline, Run } from '@/types'
 import { RunDetailDialog } from './RunDetailDialog'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
 
 export default function RunsPage() {
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
@@ -89,13 +90,13 @@ export default function RunsPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-5xl">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Exécutions</h1>
-          <p className="text-sm text-gray-500">{runs.length} exécution{runs.length > 1 ? 's' : ''}</p>
-        </div>
-        <div className="flex items-center gap-2">
+    <DashboardPageShell
+      helpKey="runs"
+      width="wide"
+      title="Exécutions"
+      description={`${runs.length} exécution${runs.length > 1 ? 's' : ''}`}
+      actions={(
+        <>
           <Select value={selected} onValueChange={setSelected}>
             <SelectTrigger className="w-56">
               <SelectValue placeholder="Tous les pipelines" />
@@ -110,9 +111,9 @@ export default function RunsPage() {
           <Button variant="outline" size="icon" onClick={loadRuns} title="Rafraîchir">
             <RefreshCw className="h-4 w-4" />
           </Button>
-        </div>
-      </div>
-
+        </>
+      )}
+    >
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
@@ -173,7 +174,7 @@ export default function RunsPage() {
         onClose={() => setOpenRun(null)}
         onChanged={loadRuns}
       />
-    </div>
+    </DashboardPageShell>
   )
 }
 

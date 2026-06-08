@@ -6,46 +6,52 @@ import Image from 'next/image'
 import {
   LayoutDashboard, GitBranch, FileUp, BarChart3, Settings,
   Bell, Key, ChevronLeft, History, Database, LayoutTemplate,
-  CalendarClock, Webhook, Activity, Terminal, FileDown, Users, Sparkles,
+  CalendarClock, Webhook, Activity, Terminal, FileDown, Users, Sparkles, Store, Plug,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNotificationStore } from '@/store/notification.store'
 import { useUIStore } from '@/store/ui.store'
+import { useTranslation } from '@/lib/i18n'
+import type { TranslationKey } from '@/lib/i18n/locales/fr'
 import { ThemeToggle } from './ThemeToggle'
+import { LanguageToggle } from './LanguageToggle'
 import { Badge } from '@/components/ui/badge'
 
-type NavItem = { label: string; icon: LucideIcon; href: string; badge?: boolean }
+type NavItem = { key: TranslationKey; icon: LucideIcon; href: string; badge?: boolean }
 
 // Section principale : le flux de travail courant, accessible d'emblée.
 const mainNav: NavItem[] = [
-  { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
-  { label: 'Pipelines', icon: GitBranch, href: '/dashboard/pipelines' },
-  { label: 'Exécutions', icon: History, href: '/dashboard/runs' },
-  { label: 'Fichiers', icon: FileUp, href: '/dashboard/files' },
-  { label: 'Sources', icon: Database, href: '/dashboard/datasources' },
-  { label: 'SQL', icon: Terminal, href: '/dashboard/transform' },
-  { label: 'Outils IA', icon: Sparkles, href: '/dashboard/ai-tools' },
-  { label: 'Analytics', icon: BarChart3, href: '/dashboard/analytics' },
-  { label: 'Notifications', icon: Bell, href: '/dashboard/notifications', badge: true },
+  { key: 'nav.dashboard', icon: LayoutDashboard, href: '/dashboard' },
+  { key: 'nav.pipelines', icon: GitBranch, href: '/dashboard/pipelines' },
+  { key: 'nav.runs', icon: History, href: '/dashboard/runs' },
+  { key: 'nav.files', icon: FileUp, href: '/dashboard/files' },
+  { key: 'nav.datasources', icon: Database, href: '/dashboard/datasources' },
+  { key: 'nav.transform', icon: Terminal, href: '/dashboard/transform' },
+  { key: 'nav.aiTools', icon: Sparkles, href: '/dashboard/ai-tools' },
+  { key: 'nav.analytics', icon: BarChart3, href: '/dashboard/analytics' },
+  { key: 'nav.marketplace', icon: Store, href: '/dashboard/marketplace' },
+  { key: 'nav.notifications', icon: Bell, href: '/dashboard/notifications', badge: true },
 ]
 
 // Section secondaire (bas) : ce qu'on utilise moins intuitivement au démarrage.
 const secondaryNav: NavItem[] = [
-  { label: 'Exports', icon: FileDown, href: '/dashboard/exports' },
-  { label: 'Templates', icon: LayoutTemplate, href: '/dashboard/templates' },
-  { label: 'Planification', icon: CalendarClock, href: '/dashboard/scheduling' },
-  { label: 'Webhooks', icon: Webhook, href: '/dashboard/webhooks' },
-  { label: 'Statut', icon: Activity, href: '/dashboard/status' },
-  { label: 'Équipe', icon: Users, href: '/dashboard/settings/organisation' },
-  { label: 'API Keys', icon: Key, href: '/dashboard/settings/api-keys' },
-  { label: 'Paramètres', icon: Settings, href: '/dashboard/settings' },
+  { key: 'nav.exports', icon: FileDown, href: '/dashboard/exports' },
+  { key: 'nav.templates', icon: LayoutTemplate, href: '/dashboard/templates' },
+  { key: 'nav.scheduling', icon: CalendarClock, href: '/dashboard/scheduling' },
+  { key: 'nav.webhooks', icon: Webhook, href: '/dashboard/webhooks' },
+  { key: 'nav.status', icon: Activity, href: '/dashboard/status' },
+  { key: 'nav.team', icon: Users, href: '/dashboard/settings/organisation' },
+  { key: 'nav.apiKeys', icon: Key, href: '/dashboard/settings/api-keys' },
+  { key: 'nav.integrations', icon: Plug, href: '/dashboard/settings/integrations' },
+  { key: 'nav.settings', icon: Settings, href: '/dashboard/settings' },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
   const unreadCount = useNotificationStore((s) => s.unreadCount)
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
+  const { t } = useTranslation()
 
   return (
     <aside className={cn(
@@ -91,15 +97,19 @@ export function Sidebar() {
         {secondaryNav.map(renderLink)}
       </div>
 
-      {/* Footer : thème + statut API */}
+      {/* Footer : langue + thème + statut API */}
       <div className="border-t border-border p-3 space-y-1">
+        {sidebarCollapsed
+          ? <LanguageToggle compact className="mx-auto" />
+          : <LanguageToggle />}
+
         {sidebarCollapsed
           ? <ThemeToggle compact className="mx-auto" />
           : <ThemeToggle />}
 
         <div className={cn('flex items-center rounded-md px-2 py-1.5 text-xs text-gray-600 transition-all', sidebarCollapsed && 'justify-center')}>
           <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-          {!sidebarCollapsed && <span className="ml-2">API connectée</span>}
+          {!sidebarCollapsed && <span className="ml-2">{t('nav.apiConnected')}</span>}
         </div>
       </div>
     </aside>
@@ -111,7 +121,7 @@ export function Sidebar() {
       <Link
         key={item.href}
         href={item.href}
-        title={sidebarCollapsed ? item.label : undefined}
+        title={sidebarCollapsed ? t(item.key) : undefined}
         className={cn(
           'flex items-center gap-2.5 rounded-md py-2 text-sm font-medium transition-colors',
           isActive
@@ -123,7 +133,7 @@ export function Sidebar() {
         <item.icon className="h-4 w-4 shrink-0" />
         {!sidebarCollapsed && (
           <>
-            <span className="flex-1">{item.label}</span>
+            <span className="flex-1">{t(item.key)}</span>
             {item.badge && unreadCount > 0 && (
               <Badge variant="destructive" className="h-4 min-w-4 px-1 text-[10px]">
                 {unreadCount}

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -16,14 +15,10 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Pipeline } from '@/types'
-
-const CRON_PRESETS = [
-  { label: 'Toutes les 15 min', value: '*/15 * * * *' },
-  { label: 'Toutes les heures', value: '0 * * * *' },
-  { label: 'Chaque jour à minuit', value: '0 0 * * *' },
-  { label: 'Chaque lundi', value: '0 0 * * 1' },
-  { label: 'Premier du mois', value: '0 0 1 * *' },
-]
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
+import { CronSchedulePicker } from '@/components/scheduling/CronSchedulePicker'
+import { ScheduledRunsView } from '@/components/scheduling/ScheduledRunsView'
+import { describeCron, TIMEZONE_OPTIONS } from '@/lib/cronSchedule'
 
 export default function SchedulingPage() {
   const [schedules, setSchedules] = useState<AppSchedule[]>([])
@@ -42,6 +37,13 @@ export default function SchedulingPage() {
     pipelines.forEach((p) => m.set(p.id, p.name))
     return m
   }, [pipelines])
+
+  const timezoneOptions = useMemo(() => {
+    if (form.timezone && !TIMEZONE_OPTIONS.some((t) => t.value === form.timezone)) {
+      return [...TIMEZONE_OPTIONS, { value: form.timezone, label: form.timezone }]
+    }
+    return TIMEZONE_OPTIONS
+  }, [form.timezone])
 
   useEffect(() => { load() }, [workspaceId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -112,15 +114,15 @@ export default function SchedulingPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-4xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Planification</h1>
-          <p className="text-sm text-gray-500">{schedules.length} planning{schedules.length > 1 ? 's' : ''}</p>
-        </div>
+    <DashboardPageShell
+      helpKey="scheduling"
+      width="default"
+      title="Planification"
+      description={`${schedules.length} planning${schedules.length > 1 ? 's' : ''}`}
+      actions={(
         <Button className="gap-2" onClick={openCreate}><Plus className="h-4 w-4" /> Nouveau planning</Button>
-      </div>
-
+      )}
+    >
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : schedules.length === 0 ? (
@@ -140,7 +142,9 @@ export default function SchedulingPage() {
                     <Badge variant={s.active ? 'success' : 'secondary'} className="text-[10px] h-5">{s.active ? 'actif' : 'en pause'}</Badge>
                   </div>
                   <p className="text-xs text-gray-600 mt-0.5">
-                    <span className="font-mono">{s.cron}</span> · {s.timezone}
+                    {describeCron(s.cron)}
+                    <span className="text-gray-700"> · </span>
+                    {s.timezone}
                     {s.next_run_at && ` · prochain ${getRelativeTime(s.next_run_at)}`}
                   </p>
                 </div>
@@ -161,7 +165,7 @@ export default function SchedulingPage() {
 
       {/* Form */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? 'Modifier le planning' : 'Nouveau planning'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-1">
             <div className="space-y-1.5">
@@ -173,20 +177,20 @@ export default function SchedulingPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Fréquence (cron)</Label>
-              <Input className="font-mono" value={form.cron} onChange={(e) => setForm({ ...form, cron: e.target.value })} />
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {CRON_PRESETS.map((p) => (
-                  <button key={p.value} onClick={() => setForm({ ...form, cron: p.value })} className="rounded-full border border-border px-2.5 py-1 text-[11px] text-gray-500 hover:border-primary hover:text-primary transition-colors">
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <CronSchedulePicker
+              value={form.cron}
+              onChange={(cron) => setForm({ ...form, cron })}
+            />
             <div className="space-y-1.5">
               <Label>Fuseau horaire</Label>
-              <Input value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} placeholder="UTC, Europe/Paris…" />
+              <Select value={form.timezone} onValueChange={(v) => setForm({ ...form, timezone: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {timezoneOptions.map((tz) => (
+                    <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
@@ -201,10 +205,13 @@ export default function SchedulingPage() {
         <DialogContent className="max-w-xl">
           <DialogHeader><DialogTitle>Runs planifiés — {runsFor ? (pipelineName.get(runsFor.pipeline_id) ?? '') : ''}</DialogTitle></DialogHeader>
           {runs == null ? <Skeleton className="h-32" /> : (
-            <pre className="max-h-[55vh] overflow-auto rounded-lg bg-background p-3 text-xs text-gray-300 font-mono">{JSON.stringify(runs, null, 2)}</pre>
+            <ScheduledRunsView
+              data={runs}
+              pipelineName={runsFor ? (pipelineName.get(runsFor.pipeline_id) ?? undefined) : undefined}
+            />
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPageShell>
   )
 }

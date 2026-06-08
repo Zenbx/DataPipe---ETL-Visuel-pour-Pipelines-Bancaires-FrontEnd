@@ -14,6 +14,7 @@ import { filesApi } from '@/lib/api/files'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
 
 export default function OrganisationPage() {
   const { currentOrgId, refreshOrgs, refreshWorkspaces } = useWorkspaceStore()
@@ -98,19 +99,17 @@ export default function OrganisationPage() {
 
   if (!currentOrgId) {
     return (
-      <div className="p-6 max-w-3xl">
+      <DashboardPageShell helpKey="organisation" width="narrow" title="Organisation & équipe">
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 gap-3">
           <Building2 className="h-10 w-10 text-gray-700" />
           <p className="text-sm text-gray-600">Aucune organisation active. Connectez-vous à une API pour la gérer.</p>
         </div>
-      </div>
+      </DashboardPageShell>
     )
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
-      <h1 className="text-xl font-bold text-foreground">Organisation &amp; équipe</h1>
-
+    <DashboardPageShell helpKey="organisation" width="narrow" title="Organisation & équipe">
       {/* Org */}
       <Card>
         <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Building2 className="h-4 w-4" /> Organisation</CardTitle></CardHeader>
@@ -221,6 +220,6 @@ export default function OrganisationPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </DashboardPageShell>
   )
 }

@@ -8,9 +8,14 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { FieldRenderer } from '@/components/editor/FieldRenderer'
+import { NODE_REGISTRY, NODE_REGISTRY_MAP, type NodeDef } from '@/lib/nodeRegistry'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { aiApi } from '@/lib/api/ai'
 import { toast } from 'sonner'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
+import { PageHelpButton } from '@/components/help/PageHelp'
 
 const SAMPLE_DATA = `[
   { "id": 1, "name": "Alice", "amount": 120, "country": "FR" },
@@ -38,11 +43,14 @@ function parseData(text: string): unknown[] | null {
 
 export default function AiToolsPage() {
   return (
-    <div className="p-6 space-y-5">
+    <DashboardPageShell helpKey="ai-tools" width="wide">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><Sparkles className="h-5 w-5 text-primary" /></div>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Outils IA</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-xl font-bold text-foreground">Outils IA</h1>
+            <PageHelpButton helpKey="ai-tools" />
+          </div>
           <p className="text-sm text-gray-500">Détection d&apos;anomalies, nettoyage, classification et plus</p>
         </div>
       </div>
@@ -68,7 +76,7 @@ export default function AiToolsPage() {
         <TabsContent value="suggest"><SuggestTool /></TabsContent>
         <TabsContent value="models"><ModelsTool /></TabsContent>
       </Tabs>
-    </div>
+    </DashboardPageShell>
   )
 }
 
@@ -230,17 +238,38 @@ function EntitiesTool() {
   )
 }
 
+function defaultNodeConfig(node: NodeDef): Record<string, unknown> {
+  const cfg: Record<string, unknown> = {}
+  for (const f of node.fields) {
+    if (f.default !== undefined) cfg[f.key] = f.default
+    else if (f.type === 'list') cfg[f.key] = []
+    else if (f.type === 'boolean') cfg[f.key] = false
+    else if (f.type === 'tags') cfg[f.key] = []
+    else if (f.type === 'kv') cfg[f.key] = {}
+  }
+  return cfg
+}
+
+const EXPLAINABLE_NODES = NODE_REGISTRY.filter((n) => !n.frontOnly)
+
 function ExplainNodeTool() {
   const [nodeType, setNodeType] = useState('filter')
-  const [configText, setConfigText] = useState('{\n  "column": "amount",\n  "operator": ">",\n  "value": 100\n}')
+  const [config, setConfig] = useState<Record<string, unknown>>(() =>
+    defaultNodeConfig(NODE_REGISTRY_MAP.filter ?? EXPLAINABLE_NODES[0]),
+  )
   const [result, setResult] = useState<unknown>(null)
   const [loading, setLoading] = useState(false)
+  const nodeDef = NODE_REGISTRY_MAP[nodeType] ?? EXPLAINABLE_NODES[0]
+
+  const handleNodeChange = (slug: string) => {
+    const def = NODE_REGISTRY_MAP[slug]
+    if (!def) return
+    setNodeType(slug)
+    setConfig(defaultNodeConfig(def))
+  }
 
   const handleRun = async () => {
     if (!nodeType.trim()) { toast.error('Type de nœud requis'); return }
-    let config: unknown
-    try { config = configText.trim() ? JSON.parse(configText) : undefined }
-    catch { toast.error('Config JSON invalide'); return }
     setLoading(true); setResult(null)
     try { setResult(await aiApi.explainNode(nodeType, config)) } catch { toast.error('Erreur IA') } finally { setLoading(false) }
   }
@@ -254,12 +283,31 @@ function ExplainNodeTool() {
       controls={<>
         <div className="space-y-1.5">
           <Label>Type de nœud</Label>
-          <Input value={nodeType} onChange={(e) => setNodeType(e.target.value)} placeholder="filter, transform, join…" />
+          <Select value={nodeType} onValueChange={handleNodeChange}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent className="max-h-64">
+              {EXPLAINABLE_NODES.map((n) => (
+                <SelectItem key={n.slug} value={n.slug}>{n.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-gray-600">{nodeDef.description}</p>
         </div>
-        <div className="space-y-1.5">
-          <Label>Configuration (JSON)</Label>
-          <Textarea className="font-mono text-xs h-36" value={configText} onChange={(e) => setConfigText(e.target.value)} />
-        </div>
+        {nodeDef.fields.length > 0 && (
+          <div className="space-y-3 rounded-lg border border-border/60 bg-background/40 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-600">Configuration</p>
+            {nodeDef.fields.map((field) => (
+              <div key={field.key} className="space-y-1.5">
+                <Label className="text-xs">{field.label}</Label>
+                <FieldRenderer
+                  field={field}
+                  value={config[field.key]}
+                  onChange={(v) => setConfig((c) => ({ ...c, [field.key]: v }))}
+                />
+              </div>
+            ))}
+          </div>
+        )}
         <Button className="gap-2" onClick={handleRun} disabled={loading}><Play className="h-4 w-4" /> Expliquer</Button>
       </>}
     />

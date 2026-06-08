@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Building2, Plug, Key, Monitor, ShieldCheck, Trash2, LogOut } from 'lucide-react'
+import { Building2, Plug, Key, Monitor, ShieldCheck, Trash2, LogOut, Upload, X } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import {
@@ -19,6 +19,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
+import { fileToAvatarDataUrl } from '@/lib/avatarImage'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -33,12 +35,34 @@ export default function SettingsPage() {
   const [showDelete, setShowDelete] = useState(false)
   const [deletePwd, setDeletePwd] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [pickingAvatar, setPickingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   const initials = name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 
   useEffect(() => {
     listSessions().then(setSessions).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    setName(user?.name ?? '')
+    setAvatarUrl(user?.avatar_url ?? '')
+  }, [user?.name, user?.avatar_url])
+
+  const handleAvatarFile = async (file: File | undefined) => {
+    if (!file) return
+    setPickingAvatar(true)
+    try {
+      const dataUrl = await fileToAvatarDataUrl(file)
+      setAvatarUrl(dataUrl)
+      toast.success('Image sélectionnée — enregistrez pour appliquer')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Image invalide')
+    } finally {
+      setPickingAvatar(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
+  }
 
   const handleRevokeSession = async (s: AppSession) => {
     try { await revokeSession(s.id); setSessions((p) => p.filter((x) => x.id !== s.id)); toast.success('Session révoquée') }
@@ -78,12 +102,16 @@ export default function SettingsPage() {
 
   const handleSaveProfile = async () => {
     setIsSaving(true)
+    const payload = { name, avatar_url: avatarUrl || undefined }
     try {
-      const updated = await updateProfile({ name, avatar_url: avatarUrl || undefined })
-      setUser({ ...user!, ...updated })
+      await updateProfile(payload)
+      setUser({ ...user!, ...payload })
       toast.success('Profil mis à jour')
-    } catch { toast.error('Erreur') }
-    finally { setIsSaving(false) }
+    } catch {
+      // Conserve au moins l’avatar local (data URL) dans le store persisté.
+      setUser({ ...user!, ...payload })
+      toast.success('Profil enregistré sur cet appareil')
+    } finally { setIsSaving(false) }
   }
 
   const handleChangePassword = async () => {
@@ -105,9 +133,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
-      <h1 className="text-xl font-bold text-foreground">Paramètres</h1>
-
+    <DashboardPageShell helpKey="settings" width="narrow" title="Paramètres">
       {/* Accès rapides */}
       <div className="grid grid-cols-3 gap-3">
         <SettingsLink href="/dashboard/settings/organisation" icon={<Building2 className="h-4 w-4 text-primary" />} label="Organisation & équipe" />
@@ -122,14 +148,57 @@ export default function SettingsPage() {
           <CardDescription>Gérez vos informations personnelles</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
+          <div className="flex items-start gap-4">
+            <Avatar className="h-16 w-16 shrink-0">
               <AvatarImage src={avatarUrl} />
               <AvatarFallback className="text-lg">{initials}</AvatarFallback>
             </Avatar>
-            <div className="flex-1 space-y-1.5">
-              <Label htmlFor="avatar">URL de l&apos;avatar</Label>
-              <Input id="avatar" placeholder="https://…" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} />
+            <div className="flex-1 space-y-3">
+              <div className="space-y-1.5">
+                <Label>Photo de profil</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => void handleAvatarFile(e.target.files?.[0])}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={pickingAvatar}
+                    onClick={() => avatarInputRef.current?.click()}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    {pickingAvatar ? 'Traitement…' : 'Choisir une image'}
+                  </Button>
+                  {avatarUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-gray-500"
+                      onClick={() => setAvatarUrl('')}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Retirer
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-600">JPG, PNG ou WebP — max. 2 Mo. L’image est redimensionnée automatiquement.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="avatar">Ou URL distante</Label>
+                <Input
+                  id="avatar"
+                  placeholder="https://…"
+                  value={avatarUrl.startsWith('data:') ? '' : avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                />
+              </div>
             </div>
           </div>
           <div className="space-y-1.5">
@@ -254,7 +323,7 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPageShell>
   )
 }
 

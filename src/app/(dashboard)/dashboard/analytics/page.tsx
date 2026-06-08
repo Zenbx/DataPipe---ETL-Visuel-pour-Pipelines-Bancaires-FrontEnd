@@ -6,33 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { analyticsApi, type TimelinePoint, type AuditLog } from '@/lib/api/analytics'
+import { analyticsApi, type AuditLog, type TimelinePoint } from '@/lib/api/analytics'
 import { aiApi } from '@/lib/api/ai'
-import { pipelinesApi } from '@/lib/api/pipelines'
-import { runsApi } from '@/lib/api/runs'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { formatNumber, getRelativeTime } from '@/lib/utils'
-import type { WorkspaceUsage, AIUsage, Run } from '@/types'
-
-// Construit la timeline 30 jours à partir des runs réels (fallback si l'endpoint
-// /analytics/runs-timeline ne renvoie rien).
-function buildTimelineFromRuns(runs: Run[], days = 30): TimelinePoint[] {
-  const buckets: Record<string, { runs: number; failed: number }> = {}
-  const today = new Date()
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today)
-    d.setDate(today.getDate() - i)
-    buckets[d.toISOString().slice(0, 10)] = { runs: 0, failed: 0 }
-  }
-  for (const r of runs) {
-    const key = (r.started_at ?? '').slice(0, 10)
-    const b = buckets[key]
-    if (!b) continue
-    b.runs++
-    if (r.status === 'failed' || r.status === 'cancelled') b.failed++
-  }
-  return Object.entries(buckets).map(([date, v]) => ({ date, runs: v.runs, failed: v.failed }))
-}
+import type { WorkspaceUsage, AIUsage } from '@/types'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
 
 export default function AnalyticsPage() {
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
@@ -57,20 +36,7 @@ export default function AnalyticsPage() {
       if (u) setUsage(u)
       if (ai) setAiUsage(ai)
       setAudit(logs)
-
-      // Timeline : si l'endpoint dédié est vide, on la reconstruit depuis les runs réels.
-      let points = tl
-      if (points.length === 0 && workspaceId && workspaceId !== 'default') {
-        try {
-          const r = await pipelinesApi.list({ workspace_id: workspaceId, per_page: 50 })
-          const ids = r.data.map((p) => p.id)
-          if (ids.length > 0) {
-            const runs = await runsApi.aggregate(ids, 30, 30)
-            points = buildTimelineFromRuns(runs, 30)
-          }
-        } catch { /* ignore */ }
-      }
-      if (alive) { setTimeline(points); setIsLoading(false) }
+      if (alive) { setTimeline(tl); setIsLoading(false) }
     })()
     return () => { alive = false }
   }, [workspaceId, orgId])
@@ -80,9 +46,7 @@ export default function AnalyticsPage() {
   const storagePercent = usage ? Math.round((usage.storage_used_mb / usage.storage_limit_mb) * 100) : 0
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl">
-      <h1 className="text-xl font-bold text-foreground">Analytics</h1>
-
+    <DashboardPageShell helpKey="analytics" width="wide" title="Analytics">
       {/* Workspace metrics */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />) : (
@@ -189,7 +153,7 @@ export default function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </DashboardPageShell>
   )
 }
 

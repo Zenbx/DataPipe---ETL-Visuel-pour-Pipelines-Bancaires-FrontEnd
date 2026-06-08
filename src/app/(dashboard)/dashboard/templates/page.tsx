@@ -14,7 +14,10 @@ import { pipelinesApi } from '@/lib/api/pipelines'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { TemplateGraphPreview, type TplNode, type TplEdge } from '@/components/templates/TemplateGraphPreview'
 import type { PipelineTemplate } from '@/types'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
+import { emitOnboardingEvent } from '@/components/onboarding/OnboardingTracker'
 
 export default function TemplatesPage() {
   const router = useRouter()
@@ -41,6 +44,11 @@ export default function TemplatesPage() {
   )
   const visible = category === 'all' ? templates : templates.filter((t) => t.category === category)
 
+  // Nœuds / arêtes extraits du détail pour l'aperçu visuel
+  const detailObj = (detail ?? {}) as { nodes?: TplNode[]; edges?: TplEdge[] }
+  const detailNodes: TplNode[] = Array.isArray(detailObj.nodes) ? detailObj.nodes : []
+  const detailEdges: TplEdge[] = Array.isArray(detailObj.edges) ? detailObj.edges : []
+
   const openTemplate = async (t: PipelineTemplate) => {
     setSelected(t)
     setName(`${t.name}`)
@@ -56,18 +64,19 @@ export default function TemplatesPage() {
     try {
       const p = await pipelinesApi.instantiateTemplate(selected.id, { name, workspace_id: workspaceId })
       toast.success('Pipeline créé depuis le template')
+      emitOnboardingEvent('datapipe:template-used')
       setSelected(null)
       router.push(`/dashboard/pipelines/${p.id}/editor`)
     } catch { toast.error('Création impossible') } finally { setBusy(false) }
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-6xl">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">Templates</h1>
-        <p className="text-sm text-gray-500">Démarrez un pipeline à partir d&apos;un modèle prêt à l&apos;emploi</p>
-      </div>
-
+    <DashboardPageShell
+      helpKey="templates"
+      width="wide"
+      title="Templates"
+      description="Démarrez un pipeline à partir d'un modèle prêt à l'emploi"
+    >
       {categories.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {categories.map((c) => (
@@ -121,15 +130,34 @@ export default function TemplatesPage() {
           </DialogHeader>
           <div className="space-y-3 py-1">
             <p className="text-sm text-gray-500">{selected?.description}</p>
-            {Boolean(detail) && (
-              <pre className="max-h-40 overflow-auto rounded-lg bg-background p-3 text-xs text-gray-400 font-mono">
-                {JSON.stringify(detail, null, 2)}
-              </pre>
-            )}
+
+            {/* Aperçu visuel du pipeline (design d'abord) */}
+            {detailNodes.length > 0 ? (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-gray-500">Aperçu du pipeline</p>
+                  <span className="text-[11px] text-gray-600">{detailNodes.length} nœud{detailNodes.length > 1 ? 's' : ''}</span>
+                </div>
+                <TemplateGraphPreview nodes={detailNodes} edges={detailEdges} />
+              </div>
+            ) : detail ? (
+              <Skeleton className="h-55 w-full" />
+            ) : null}
+
             <div className="space-y-1.5">
               <Label>Nom du nouveau pipeline</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
             </div>
+
+            {/* JSON brut — secondaire, pour les devs */}
+            {Boolean(detail) && (
+              <details className="group">
+                <summary className="cursor-pointer text-xs text-gray-600 hover:text-gray-400 select-none">Voir la structure (JSON)</summary>
+                <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-background p-3 text-[11px] text-gray-500 font-mono">
+                  {JSON.stringify(detail, null, 2)}
+                </pre>
+              </details>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelected(null)}>Annuler</Button>
@@ -139,6 +167,6 @@ export default function TemplatesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPageShell>
   )
 }

@@ -14,6 +14,9 @@ import { runsApi } from '@/lib/api/runs'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { formatDuration, getRelativeTime } from '@/lib/utils'
 import type { WorkspaceUsage, Pipeline, Run } from '@/types'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
+import { PageHelpButton } from '@/components/help/PageHelp'
+import { OnboardingChecklist } from '@/components/onboarding/OnboardingChecklist'
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
@@ -65,14 +68,18 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl">
-      {/* Welcome */}
+    <DashboardPageShell helpKey="dashboard" width="wide">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          Bonjour, {user?.name?.split(' ')[0]} 👋
-        </h1>
+        <div className="flex items-center gap-1.5">
+          <h1 className="text-2xl font-bold text-foreground">
+            Bonjour, {user?.name?.split(' ')[0]} 👋
+          </h1>
+          <PageHelpButton helpKey="dashboard" />
+        </div>
         <p className="mt-1 text-sm text-gray-500">Voici un aperçu de votre workspace</p>
       </div>
+
+      <OnboardingChecklist />
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -192,7 +199,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </DashboardPageShell>
   )
 }
 

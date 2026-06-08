@@ -393,4 +393,4 @@ export const NODE_REGISTRY_MAP: Record<string, NodeDef> = Object.fromEntries(
 )
 
 // Ordered categories for the drawer
-export const CATEGORY_ORDER = ['Input', 'Transform', 'AI', 'Output', 'Control', 'Trigger', 'Visualisation']
+export const CATEGORY_ORDER = ['Input', 'Transform', 'Banque', 'AI', 'Output', 'Control', 'Trigger', 'Visualisation']

@@ -1,0 +1,75 @@
+// Dictionnaire FR — langue de référence. Les clés sont partagées par toutes les langues.
+export const fr = {
+  // Commun
+  'common.save': 'Sauvegarder',
+  'common.saving': 'Sauvegarde…',
+  'common.cancel': 'Annuler',
+  'common.delete': 'Supprimer',
+  'common.create': 'Créer',
+  'common.edit': 'Modifier',
+  'common.close': 'Fermer',
+  'common.confirm': 'Confirmer',
+  'common.search': 'Rechercher…',
+  'common.loading': 'Chargement…',
+  'common.retry': 'Réessayer',
+  'common.download': 'Télécharger',
+  'common.optional': 'optionnel',
+  'common.none': 'Aucun',
+  'common.yes': 'Oui',
+  'common.no': 'Non',
+
+  // Navigation (sidebar)
+  'nav.dashboard': 'Dashboard',
+  'nav.pipelines': 'Pipelines',
+  'nav.runs': 'Exécutions',
+  'nav.files': 'Fichiers',
+  'nav.datasources': 'Sources',
+  'nav.transform': 'SQL',
+  'nav.aiTools': 'Outils IA',
+  'nav.analytics': 'Analytics',
+  'nav.marketplace': 'Marketplace',
+  'nav.notifications': 'Notifications',
+  'nav.exports': 'Exports',
+  'nav.templates': 'Templates',
+  'nav.scheduling': 'Planification',
+  'nav.webhooks': 'Webhooks',
+  'nav.status': 'Statut',
+  'nav.team': 'Équipe',
+  'nav.apiKeys': 'Clés API',
+  'nav.integrations': 'Intégrations',
+  'nav.settings': 'Paramètres',
+  'nav.apiConnected': 'API connectée',
+
+  // Éditeur
+  'editor.run': 'Exécuter',
+  'editor.stop': 'Arrêter',
+  'editor.addNode': 'Ajouter votre nœud',
+  'editor.addNodeTitle': 'Ajouter un nœud',
+  'editor.connectNode': 'Connecter un nœud',
+  'editor.logs': 'Logs',
+  'editor.data': 'Données',
+  'editor.schema': 'Schéma',
+  'editor.fitView': 'Ajuster la vue',
+  'editor.zoomIn': 'Zoomer',
+  'editor.zoomOut': 'Dézoomer',
+  'editor.tidy': 'Réorganiser les nœuds',
+  'editor.lock': 'Verrouiller le canvas',
+  'editor.unlock': 'Déverrouiller le canvas',
+  'editor.assistant': 'Assistant IA',
+
+  // Pipelines
+  'pipelines.title': 'Pipelines',
+  'pipelines.new': 'Nouveau pipeline',
+  'pipelines.name': 'Nom du pipeline',
+  'pipelines.description': 'Description',
+  'pipelines.createAndOpen': 'Créer et ouvrir',
+  'pipelines.empty': 'Aucun pipeline',
+  'pipelines.emptyHint': 'Créez votre premier pipeline pour commencer',
+
+  // Thème / langue
+  'theme.dark': 'Thème sombre',
+  'theme.light': 'Thème clair',
+  'lang.label': 'Langue',
+} as const
+
+export type TranslationKey = keyof typeof fr

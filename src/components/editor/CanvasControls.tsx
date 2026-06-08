@@ -9,7 +9,7 @@ import { useEditorStore } from '@/store/editor.store'
 import { useUIStore } from '@/store/ui.store'
 import { runsApi } from '@/lib/api/runs'
 import { nodesApi } from '@/lib/api/nodes'
-import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses, computeExecutionOrder } from '@/lib/runWatcher'
+import { validatePipelineForRun, watchRun, finalizeRunNodeStatuses, computeExecutionOrder, applyRunLogs } from '@/lib/runWatcher'
 import { toast } from 'sonner'
 
 interface CanvasControlsProps {
@@ -101,28 +101,35 @@ export function CanvasControls({ pipelineId }: CanvasControlsProps) {
       const run = await runsApi.run(pipelineId)
       stopWatchRef.current?.()
       setActiveRun(run.id)
-      setRunStatus('running')
       setConsoleOpen(true)
 
-      const { nodes: ns, edges: es } = useEditorStore.getState()
-      stopWatchRef.current = watchRun({
-        pipelineId,
-        runId: run.id,
-        executionOrder: computeExecutionOrder(ns, es),
-        onLog: (log) => appendLog(log),
-        onNodeStatus: (nodeId, status) => setNodeStatus(nodeId, status),
-        onComplete: (status) => {
-          finalizeRunNodeStatuses(
-            useEditorStore.getState().nodeStatuses,
-            status,
-            setNodeStatus,
-          )
-          setRunStatus(status)
-          toast[status === 'success' ? 'success' : 'error'](
-            status === 'success' ? 'Run terminé' : 'Run terminé avec erreurs',
-          )
-        },
-      })
+      if (run.status === 'running' || run.status === 'queued') {
+        // Backend asynchrone : on surveille (SSE + polling).
+        setRunStatus('running')
+        const { nodes: ns, edges: es } = useEditorStore.getState()
+        stopWatchRef.current = watchRun({
+          pipelineId,
+          runId: run.id,
+          executionOrder: computeExecutionOrder(ns, es),
+          onLog: (log) => appendLog(log),
+          onNodeStatus: (nodeId, status) => setNodeStatus(nodeId, status),
+          onComplete: (status) => {
+            finalizeRunNodeStatuses(useEditorStore.getState().nodeStatuses, status, setNodeStatus)
+            setRunStatus(status)
+            toast[status === 'success' ? 'success' : 'error'](
+              status === 'success' ? 'Run terminé' : 'Run terminé avec erreurs',
+            )
+          },
+        })
+      } else {
+        // Backend SYNCHRONE (cas actuel) : le run est déjà terminé → on lit ses logs.
+        const logs = await runsApi.getLogs(run.id).catch(() => [])
+        applyRunLogs(logs, run.status, (l) => appendLog(l), (nid, st) => setNodeStatus(nid, st))
+        setRunStatus(run.status)
+        toast[run.status === 'success' ? 'success' : 'error'](
+          run.status === 'success' ? 'Run terminé' : 'Run terminé avec erreurs',
+        )
+      }
     } catch {
       toast.error("Erreur lors de l'exécution")
       setRunStatus('failed')

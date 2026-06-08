@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { pipelinesApi } from '@/lib/api/pipelines'
 import { getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -24,6 +25,9 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import type { Pipeline } from '@/types'
 import { PipelineVersionsDialog } from './PipelineVersionsDialog'
 import { MergeDialog } from './MergeDialog'
+import { PublishPipelineDialog } from '@/components/marketplace/PublishPipelineDialog'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
+import { emitOnboardingEvent } from '@/components/onboarding/OnboardingTracker'
 
 export default function PipelinesPage() {
   const router = useRouter()
@@ -34,9 +38,11 @@ export default function PipelinesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newDescription, setNewDescription] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [versionsFor, setVersionsFor] = useState<Pipeline | null>(null)
   const [showMerge, setShowMerge] = useState(false)
+  const [publishTarget, setPublishTarget] = useState<Pipeline | null>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -73,10 +79,16 @@ export default function PipelinesPage() {
     if (!newName.trim()) return
     setIsCreating(true)
     try {
-      const p = await pipelinesApi.create({ name: newName, workspace_id: workspaceId })
+      const p = await pipelinesApi.create({
+        name: newName,
+        workspace_id: workspaceId,
+        description: newDescription.trim() || undefined,
+      })
       toast.success('Pipeline créé')
+      emitOnboardingEvent('datapipe:pipeline-created')
       setShowCreate(false)
       setNewName('')
+      setNewDescription('')
       router.push(`/dashboard/pipelines/${p.id}/editor`)
     } catch {
       toast.error('Erreur lors de la création')
@@ -99,14 +111,6 @@ export default function PipelinesPage() {
       toast.success('Pipeline supprimé')
       loadPipelines()
     } catch { toast.error('Erreur') }
-  }
-
-  const handlePublish = async (p: Pipeline) => {
-    try {
-      await pipelinesApi.publish(p.id)
-      toast.success('Pipeline publié')
-      loadPipelines()
-    } catch { toast.error('Erreur lors de la publication') }
   }
 
   const handleArchive = async (p: Pipeline) => {
@@ -157,13 +161,13 @@ export default function PipelinesPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-6xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Pipelines</h1>
-          <p className="text-sm text-gray-500">{pipelines.length} pipeline{pipelines.length > 1 ? 's' : ''}</p>
-        </div>
-        <div className="flex items-center gap-2">
+    <DashboardPageShell
+      helpKey="pipelines"
+      width="wide"
+      title="Pipelines"
+      description={`${pipelines.length} pipeline${pipelines.length > 1 ? 's' : ''}`}
+      actions={(
+        <>
           <input
             ref={importInputRef}
             type="file"
@@ -177,12 +181,12 @@ export default function PipelinesPage() {
           <Button variant="outline" className="gap-2" onClick={() => setShowMerge(true)} disabled={pipelines.length < 2}>
             <GitMerge className="h-4 w-4" /> Fusionner
           </Button>
-          <Button onClick={() => setShowCreate(true)} className="gap-2">
+          <Button onClick={() => setShowCreate(true)} className="gap-2" data-tour="new-pipeline">
             <Plus className="h-4 w-4" /> Nouveau pipeline
           </Button>
-        </div>
-      </div>
-
+        </>
+      )}
+    >
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-600" />
@@ -251,8 +255,8 @@ export default function PipelinesPage() {
                       <DropdownMenuItem onClick={() => setVersionsFor(p)}>
                         <History className="h-4 w-4" /> Versions
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handlePublish(p)}>
-                        <Rocket className="h-4 w-4" /> Publier
+                      <DropdownMenuItem onClick={() => setPublishTarget(p)}>
+                        <Rocket className="h-4 w-4" /> Publier sur la marketplace
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleDuplicate(p)}>
                         <Copy className="h-4 w-4" /> Dupliquer
@@ -311,6 +315,15 @@ export default function PipelinesPage() {
                 autoFocus
               />
             </div>
+            <div className="space-y-1.5">
+              <Label>Description <span className="font-normal text-gray-600">(optionnel)</span></Label>
+              <Textarea
+                placeholder="À quoi sert ce pipeline ?"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                className="min-h-[60px] resize-none text-sm"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
@@ -328,6 +341,12 @@ export default function PipelinesPage() {
         onClose={() => setShowMerge(false)}
         onMerged={loadPipelines}
       />
-    </div>
+
+      <PublishPipelineDialog
+        pipeline={publishTarget}
+        open={Boolean(publishTarget)}
+        onOpenChange={(open) => { if (!open) setPublishTarget(null) }}
+      />
+    </DashboardPageShell>
   )
 }

@@ -12,6 +12,7 @@ import {
   transformApi, type SqlResult, type SqlTemplate, type SqlFunction, type SqlHistoryEntry,
 } from '@/lib/api/transform'
 import { toast } from 'sonner'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
 
 export default function TransformPage() {
   const [query, setQuery] = useState('SELECT * FROM data LIMIT 100;')
@@ -79,15 +80,13 @@ export default function TransformPage() {
   }
 
   return (
-    <div className="p-6 space-y-4 max-w-6xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Transformations SQL</h1>
-          <p className="text-sm text-gray-500">Écrivez, validez et exécutez des requêtes sur vos données</p>
-        </div>
-        {sample && <Badge variant="warning" className="h-6">Échantillon : {sample.length} lignes</Badge>}
-      </div>
-
+    <DashboardPageShell
+      helpKey="transform"
+      width="wide"
+      title="Transformations SQL"
+      description="Écrivez, validez et exécutez des requêtes sur vos données"
+      actions={sample ? <Badge variant="warning" className="h-6">Échantillon : {sample.length} lignes</Badge> : undefined}
+    >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Éditeur */}
         <div className="lg:col-span-2 space-y-3">
@@ -182,7 +181,7 @@ export default function TransformPage() {
           </Tabs>
         </Card>
       </div>
-    </div>
+    </DashboardPageShell>
   )
 }
 

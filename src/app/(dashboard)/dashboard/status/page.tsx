@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { systemApi } from '@/lib/api/system'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
+import { PageHelpButton } from '@/components/help/PageHelp'
 
 type Probe = { label: string; ok: boolean | null; detail?: string }
 
@@ -64,12 +66,15 @@ export default function StatusPage() {
   const anyDown = probes.some((p) => p.ok === false)
 
   return (
-    <div className="p-6 space-y-5">
+    <DashboardPageShell helpKey="status" width="full">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><Activity className="h-5 w-5 text-primary" /></div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">Statut du système</h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-xl font-bold text-foreground">Statut du système</h1>
+              <PageHelpButton helpKey="status" />
+            </div>
             <p className="text-sm text-gray-500">Santé de l&apos;API, métriques et catalogue de nœuds</p>
           </div>
         </div>
@@ -178,6 +183,6 @@ export default function StatusPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </DashboardPageShell>
   )
 }

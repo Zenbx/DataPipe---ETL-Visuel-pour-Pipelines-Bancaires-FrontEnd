@@ -1,7 +1,11 @@
-import { AnalyticsService } from '@/lib2'
+import { AnalyticsService, RunsService } from '@/lib2'
 import { filesApi } from '@/lib/api/files'
 import { orgsApi } from '@/lib/api/orgs'
+import { pipelinesApi } from '@/lib/api/pipelines'
+import { runsApi } from '@/lib/api/runs'
+import { schedulingApi } from '@/lib/api/scheduling'
 import type { WorkspaceUsage, PipelineAnalytics } from '@/types'
+import type { Run } from '@/types'
 
 const PLAN_STORAGE_LIMIT_MB: Record<string, number> = {
   free: 1024,
@@ -9,59 +13,131 @@ const PLAN_STORAGE_LIMIT_MB: Record<string, number> = {
   enterprise: 102_400,
 }
 
-function mapWorkspaceUsage(raw: Record<string, unknown>): WorkspaceUsage {
+const FAILED_STATUSES = new Set(['failed', 'error', 'cancelled'])
+
+function monthStartIso(): string {
+  const d = new Date()
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString()
+}
+
+function isThisMonth(iso?: string): boolean {
+  if (!iso) return false
+  return iso >= monthStartIso()
+}
+
+function mapTimelinePoint(raw: Record<string, unknown>): TimelinePoint {
+  const runs = Number(raw.runs ?? raw.total ?? 0)
+  const success = Number(raw.success ?? 0)
+  const failed = Number(
+    raw.failed ?? raw.error ?? Math.max(0, runs - success),
+  )
   return {
-    storage_used_mb: Number(
-      raw.storage_used_mb ?? raw.storage_mb ?? raw.used_storage_mb ?? 0,
-    ),
-    storage_limit_mb: Number(raw.storage_limit_mb ?? raw.storage_limit ?? 1024),
-    runs_this_month: Number(raw.runs_this_month ?? raw.total_runs ?? 0),
-    rows_processed_this_month: Number(
-      raw.rows_processed_this_month ?? raw.rows_processed ?? raw.data_processed ?? 0,
-    ),
-    active_pipelines: Number(raw.active_pipelines ?? raw.pipelines_count ?? 0),
-    scheduled_runs: Number(raw.scheduled_runs ?? 0),
+    date: String(raw.date ?? ''),
+    runs,
+    success,
+    failed,
   }
 }
 
-function unwrapRecord(raw: unknown): Record<string, unknown> {
-  if (!raw || typeof raw !== 'object') return {}
-  const obj = raw as Record<string, unknown>
-  const nested = obj.data ?? obj.usage ?? obj.overview ?? obj.metrics
-  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-    return nested as Record<string, unknown>
+/** Timeline 30 jours reconstruite depuis les runs réels du workspace. */
+export function buildTimelineFromRuns(runs: Run[], days = 30): TimelinePoint[] {
+  const buckets: Record<string, { runs: number; failed: number; success: number }> = {}
+  const today = new Date()
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    buckets[d.toISOString().slice(0, 10)] = { runs: 0, failed: 0, success: 0 }
   }
-  return obj
+  for (const r of runs) {
+    const key = (r.started_at ?? '').slice(0, 10)
+    const b = buckets[key]
+    if (!b) continue
+    b.runs++
+    if (r.status === 'success') b.success++
+    if (FAILED_STATUSES.has(r.status)) b.failed++
+  }
+  return Object.entries(buckets).map(([date, v]) => ({
+    date,
+    runs: v.runs,
+    success: v.success,
+    failed: v.failed,
+  }))
+}
+
+async function workspacePipelineIds(workspaceId: string): Promise<string[]> {
+  if (!workspaceId || workspaceId === 'default') return []
+  const res = await pipelinesApi.list({ workspace_id: workspaceId, per_page: 50 })
+  return res.data.map((p) => p.id)
+}
+
+async function sumRowsProcessed(runs: Run[], maxDetail = 15): Promise<number> {
+  const monthRuns = runs.filter((r) => isThisMonth(r.started_at)).slice(0, maxDetail)
+  let total = 0
+  await Promise.all(
+    monthRuns.map(async (r) => {
+      if (!r.pipeline_id) return
+      try {
+        const detail = (await RunsService.getPipelinesRuns1(r.pipeline_id, r.id)) as {
+          node_results?: Record<string, { rows_output?: number }>
+        }
+        const results = detail.node_results
+        if (!results) return
+        for (const v of Object.values(results)) {
+          total += v?.rows_output ?? 0
+        }
+      } catch { /* run sans résultats détaillés */ }
+    }),
+  )
+  return total
 }
 
 /**
- * Analytics branchés sur le workspace courant.
- * - KPIs : GET /analytics/overview?workspace_id=…
- * - Stockage utilisé : somme réelle des fichiers du workspace
- * - Limite stockage : GET /analytics/usage ou plan org
+ * Analytics branchés sur le workspace courant (côté front).
+ * Les endpoints /analytics/* du backend renvoient parfois des champs mockés ou
+ * des noms différents (`total` vs `runs`) : on normalise et on reconstitue
+ * les KPIs depuis pipelines / runs / fichiers / schedules quand c'est nécessaire.
  */
 export const analyticsApi = {
   async getWorkspaceUsage(workspaceId: string, orgId?: string): Promise<WorkspaceUsage> {
-    const overview = unwrapRecord(await AnalyticsService.getAnalyticsOverview(workspaceId))
-    const usage = mapWorkspaceUsage(overview)
+    const listed = workspaceId && workspaceId !== 'default'
+      ? await pipelinesApi.list({ workspace_id: workspaceId, per_page: 50 }).catch(() => ({ data: [] }))
+      : { data: [] as Awaited<ReturnType<typeof pipelinesApi.list>>['data'] }
+    const pipelineIds = listed.data.map((p) => p.id)
+
+    const [runs, schedules] = await Promise.all([
+      pipelineIds.length > 0
+        ? runsApi.aggregate(pipelineIds, 30, 30)
+        : Promise.resolve([] as Run[]),
+      schedulingApi.listAll(workspaceId).catch(() => []),
+    ])
+
+    const runsThisMonth = runs.filter((r) => isThisMonth(r.started_at))
+    const pipelineSet = new Set(pipelineIds)
+    const scheduledActive = schedules.filter(
+      (s) => s.active && pipelineSet.has(s.pipeline_id),
+    ).length
+    const activePipelines = listed.data.filter((p) => p.status === 'active').length
+
+    const usage: WorkspaceUsage = {
+      storage_used_mb: 0,
+      storage_limit_mb: PLAN_STORAGE_LIMIT_MB.free,
+      runs_this_month: runsThisMonth.length,
+      rows_processed_this_month: await sumRowsProcessed(runs),
+      active_pipelines: activePipelines,
+      scheduled_runs: scheduledActive,
+    }
 
     try {
       usage.storage_used_mb = await filesApi.getStorageUsageMb(workspaceId)
-    } catch { /* conserver la valeur overview si listing fichiers indisponible */ }
-
-    try {
-      const quota = unwrapRecord(await AnalyticsService.getAnalyticsUsage())
-      const limit = Number(quota.storage_limit_mb ?? quota.storage_limit ?? 0)
-      if (limit > 0) usage.storage_limit_mb = limit
-    } catch { /* quota org indisponible */ }
+    } catch { /* ignore */ }
 
     if (orgId) {
       try {
         const org = await orgsApi.get(orgId)
-        if (org.plan && usage.storage_limit_mb <= 1024) {
+        if (org.plan) {
           usage.storage_limit_mb = PLAN_STORAGE_LIMIT_MB[org.plan] ?? usage.storage_limit_mb
         }
-      } catch { /* plan org indisponible */ }
+      } catch { /* ignore */ }
     }
 
     return usage
@@ -77,11 +153,20 @@ export const analyticsApi = {
 
   async getRunsTimeline(workspaceId: string, days = 30): Promise<TimelinePoint[]> {
     const raw = (await AnalyticsService.getAnalyticsRunsTimeline(workspaceId, days)) as {
-      timeline?: TimelinePoint[]
-      data?: TimelinePoint[]
-      items?: TimelinePoint[]
+      timeline?: Record<string, unknown>[]
+      data?: Record<string, unknown>[]
+      items?: Record<string, unknown>[]
     }
-    return raw.timeline ?? raw.data ?? raw.items ?? []
+    const points = (raw.timeline ?? raw.data ?? raw.items ?? []).map((p) => mapTimelinePoint(p))
+
+    const hasData = points.some((p) => (p.runs ?? 0) > 0)
+    if (hasData) return points
+
+    const pipelineIds = await workspacePipelineIds(workspaceId)
+    if (pipelineIds.length === 0) return points
+
+    const runs = await runsApi.aggregate(pipelineIds, days, 30)
+    return buildTimelineFromRuns(runs, days)
   },
 
   async getAuditLogs(

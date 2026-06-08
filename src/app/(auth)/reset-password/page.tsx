@@ -1,15 +1,39 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import Image from 'next/image'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { resetPassword } from '@/lib/api/auth'
 import { toast } from 'sonner'
+import { AuthGlassCard, AuthPageShell } from '@/components/auth/AuthPageShell'
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  height: 42,
+  padding: '0 14px',
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.09)',
+  borderRadius: 10,
+  color: '#f0f0f0',
+  fontSize: 13,
+  fontFamily: 'inherit',
+  outline: 'none',
+  transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
+}
+
+const onFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+  e.currentTarget.style.borderColor = '#ff6d35'
+  e.currentTarget.style.background = 'rgba(255,109,53,0.04)'
+  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255,109,53,0.12)'
+}
+
+const onBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'
+  e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+  e.currentTarget.style.boxShadow = 'none'
+}
 
 function ResetPasswordForm() {
   const router = useRouter()
@@ -18,6 +42,9 @@ function ResetPasswordForm() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setTimeout(() => setMounted(true), 80) }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,50 +56,115 @@ function ResetPasswordForm() {
       await resetPassword(token, password)
       toast.success('Mot de passe réinitialisé')
       router.push('/login')
-    } catch { toast.error('Token invalide ou expiré') }
-    finally { setIsLoading(false) }
+    } catch {
+      toast.error('Token invalide ou expiré')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <div className="w-full max-w-sm rounded-xl border border-[#1e1e1e] bg-[#111111] p-8 shadow-xl">
-      <h1 className="mb-1 text-xl font-semibold text-gray-100">Nouveau mot de passe</h1>
-      <p className="mb-6 text-sm text-gray-500">Choisissez un nouveau mot de passe pour votre compte</p>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <AuthGlassCard mounted={mounted}>
+      <div style={{ marginBottom: 28 }}>
+        <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <Image src="/logo.png" alt="DataPipe" width={52} height={52} style={{ borderRadius: 9 }} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#f0f0f0', letterSpacing: '-0.2px' }}>DataPipe</span>
+        </Link>
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 200, color: '#f5f5f5', letterSpacing: '-0.5px', marginBottom: 6 }}>
+          Nouveau mot de passe
+        </h1>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.32)', lineHeight: 1.5 }}>
+          Choisissez un nouveau mot de passe pour votre compte.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {!params.get('token') && (
-          <div className="space-y-1.5">
-            <Label htmlFor="token">Token de réinitialisation</Label>
-            <Input id="token" value={token} onChange={(e) => setToken(e.target.value)} required />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>
+              Token de réinitialisation
+            </label>
+            <input
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              required
+              style={inputStyle}
+              onFocus={onFocus}
+              onBlur={onBlur}
+            />
           </div>
         )}
-        <div className="space-y-1.5">
-          <Label htmlFor="password">Nouveau mot de passe</Label>
-          <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>
+            Nouveau mot de passe
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoFocus={!!params.get('token')}
+            style={inputStyle}
+            onFocus={onFocus}
+            onBlur={onBlur}
+          />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="confirm">Confirmer</Label>
-          <Input id="confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>
+            Confirmer
+          </label>
+          <input
+            type="password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+            style={inputStyle}
+            onFocus={onFocus}
+            onBlur={onBlur}
+          />
         </div>
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? 'Réinitialisation…' : 'Réinitialiser'}
-        </Button>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          style={{
+            marginTop: 4, height: 44, width: '100%',
+            background: isLoading ? 'rgba(255,109,53,0.5)' : '#ff6d35',
+            border: 'none', borderRadius: 11,
+            color: '#fff', fontSize: 14, fontWeight: 200, fontFamily: 'inherit',
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            boxShadow: isLoading ? 'none' : '0 4px 24px rgba(255,109,53,0.28)',
+          }}
+        >
+          {isLoading ? 'Réinitialisation…' : <>Réinitialiser <ArrowRight style={{ width: 15, height: 15 }} /></>}
+        </button>
       </form>
-      <Link href="/login" className="mt-4 flex items-center justify-center gap-1.5 text-sm text-gray-600 hover:text-gray-400">
-        <ArrowLeft className="h-3.5 w-3.5" /> Retour
+
+      <Link href="/login" style={{
+        marginTop: 20,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        fontSize: 13, color: 'rgba(255,255,255,0.28)', textDecoration: 'none',
+      }}>
+        <ArrowLeft style={{ width: 14, height: 14 }} /> Retour
       </Link>
-    </div>
+    </AuthGlassCard>
   )
 }
 
 export default function ResetPasswordPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0a0a0a] p-4">
-      <div className="mb-8 flex items-center gap-3">
-        <Image src="/logo.png" alt="DataPipe" width={56} height={56} className="rounded-xl" />
-        <span className="text-xl font-bold tracking-tight text-gray-100">DataPipe</span>
-      </div>
-      <Suspense fallback={<div className="text-gray-500 text-sm">Chargement…</div>}>
+    <AuthPageShell>
+      <Suspense fallback={
+        <AuthGlassCard mounted>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>Chargement…</p>
+        </AuthGlassCard>
+      }>
         <ResetPasswordForm />
       </Suspense>
-    </div>
+    </AuthPageShell>
   )
 }

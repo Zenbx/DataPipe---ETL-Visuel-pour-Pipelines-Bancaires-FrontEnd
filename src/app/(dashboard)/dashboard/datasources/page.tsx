@@ -9,13 +9,21 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import { StructuredConfigForm } from '@/components/forms/StructuredConfigForm'
+import {
+  DATASOURCE_CONFIG_FIELDS,
+  buildConfigObject,
+  defaultConfigValues,
+  validateConfigFields,
+} from '@/lib/configFields'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { datasourcesApi, type AppDatasource, type DatasourceType } from '@/lib/api/datasources'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
+import { DatasourceSchemaView } from '@/components/datasources/DatasourceSchemaView'
 
 const TYPES: { value: DatasourceType; label: string }[] = [
   { value: 'postgresql', label: 'PostgreSQL' },
@@ -32,14 +40,17 @@ export default function DatasourcesPage() {
   const [items, setItems] = useState<AppDatasource[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ name: '', type: 'postgresql' as DatasourceType, configText: '{\n  \n}' })
+  const [form, setForm] = useState({
+    name: '',
+    type: 'postgresql' as DatasourceType,
+    configValues: defaultConfigValues(DATASOURCE_CONFIG_FIELDS.postgresql ?? []),
+  })
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState<AppDatasource | null>(null)
   const [schemaFor, setSchemaFor] = useState<AppDatasource | null>(null)
   const [schema, setSchema] = useState<unknown>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
-  const [types, setTypes] = useState<Record<string, unknown> | null>(null)
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
 
   useEffect(() => { load() }, [workspaceId]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -52,26 +63,33 @@ export default function DatasourcesPage() {
     finally { setIsLoading(false) }
   }
 
-  const openCreate = async () => {
-    setShowCreate(true)
-    if (!types) {
-      try { setTypes((await datasourcesApi.getTypes()) as Record<string, unknown>) } catch { /* optionnel */ }
-    }
-  }
+  const openCreate = () => setShowCreate(true)
 
-  const typeHint = types?.[form.type] ?? (Array.isArray(types) ? undefined : undefined)
+  const configFields = DATASOURCE_CONFIG_FIELDS[form.type] ?? []
+
+  const handleTypeChange = (type: DatasourceType) => {
+    setForm({
+      ...form,
+      type,
+      configValues: defaultConfigValues(DATASOURCE_CONFIG_FIELDS[type] ?? []),
+    })
+  }
 
   const handleCreate = async () => {
     if (!form.name.trim()) return
-    let config: Record<string, unknown> | undefined
-    try { config = form.configText.trim() ? JSON.parse(form.configText) : undefined }
-    catch { toast.error('Config JSON invalide'); return }
+    const err = validateConfigFields(configFields, form.configValues)
+    if (err) { toast.error(err); return }
+    const config = buildConfigObject(configFields, form.configValues)
     setBusy(true)
     try {
       await datasourcesApi.create({ name: form.name, type: form.type, config, workspace_id: workspaceId })
       toast.success('Source créée')
       setShowCreate(false)
-      setForm({ name: '', type: 'postgresql', configText: '{\n  \n}' })
+      setForm({
+        name: '',
+        type: 'postgresql',
+        configValues: defaultConfigValues(DATASOURCE_CONFIG_FIELDS.postgresql ?? []),
+      })
       load()
     } catch { toast.error('Création impossible') } finally { setBusy(false) }
   }
@@ -126,17 +144,17 @@ export default function DatasourcesPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-5xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Sources de données</h1>
-          <p className="text-sm text-gray-500">{items.length} source{items.length > 1 ? 's' : ''} connectée{items.length > 1 ? 's' : ''}</p>
-        </div>
+    <DashboardPageShell
+      helpKey="datasources"
+      width="wide"
+      title="Sources de données"
+      description={`${items.length} source${items.length > 1 ? 's' : ''} connectée${items.length > 1 ? 's' : ''}`}
+      actions={(
         <Button className="gap-2" onClick={openCreate}>
           <Plus className="h-4 w-4" /> Nouvelle source
         </Button>
-      </div>
-
+      )}
+    >
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : items.length === 0 ? (
@@ -187,7 +205,7 @@ export default function DatasourcesPage() {
 
       {/* Création */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nouvelle source de données</DialogTitle></DialogHeader>
           <div className="space-y-3 py-1">
             <div className="space-y-1.5">
@@ -196,25 +214,18 @@ export default function DatasourcesPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as DatasourceType })}>
+              <Select value={form.type} onValueChange={(v) => handleTypeChange(v as DatasourceType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Configuration (JSON)</Label>
-              <Textarea
-                className="font-mono text-xs h-28"
-                placeholder='{ "host": "localhost", "port": 5432, "database": "app" }'
-                value={form.configText}
-                onChange={(e) => setForm({ ...form, configText: e.target.value })}
-              />
-              {Boolean(typeHint) && (
-                <p className="text-[11px] text-gray-600">Champs attendus : <span className="font-mono">{JSON.stringify(typeHint)}</span></p>
-              )}
-            </div>
+            <StructuredConfigForm
+              fields={configFields}
+              values={form.configValues}
+              onChange={(configValues) => setForm({ ...form, configValues })}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
@@ -253,12 +264,10 @@ export default function DatasourcesPage() {
           {schema == null ? (
             <Skeleton className="h-40" />
           ) : (
-            <pre className="max-h-[60vh] overflow-auto rounded-lg bg-background p-3 text-xs text-gray-300 font-mono">
-              {JSON.stringify(schema, null, 2)}
-            </pre>
+            <DatasourceSchemaView schema={schema} datasourceName={schemaFor?.name} />
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPageShell>
   )
 }

@@ -11,6 +11,7 @@ import { getRelativeTime, cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Notification } from '@/types'
 import { AlertsPanel } from './AlertsPanel'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
 
 const typeConfig: Record<string, { icon: React.ReactNode; color: string }> = {
   run_failed: { icon: <AlertTriangle className="h-4 w-4" />, color: 'text-red-400' },
@@ -52,12 +53,12 @@ export default function NotificationsPage() {
   const unread = notifications.filter((n) => !n.read).length
 
   return (
-    <div className="p-6 space-y-5 max-w-3xl">
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-bold text-foreground">Notifications</h1>
-        {unread > 0 && <Badge variant="destructive">{unread} non lues</Badge>}
-      </div>
-
+    <DashboardPageShell
+      helpKey="notifications"
+      width="narrow"
+      title="Notifications"
+      actions={unread > 0 ? <Badge variant="destructive">{unread} non lues</Badge> : undefined}
+    >
       <Tabs defaultValue="notifications">
         <TabsList>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -117,6 +118,6 @@ export default function NotificationsPage() {
           <AlertsPanel />
         </TabsContent>
       </Tabs>
-    </div>
+    </DashboardPageShell>
   )
 }

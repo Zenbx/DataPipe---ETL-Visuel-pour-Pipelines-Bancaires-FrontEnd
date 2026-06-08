@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { resultsApi, exportName, type ExportItem, type ResultItem } from '@/lib/api/results'
 import { pipelinesApi } from '@/lib/api/pipelines'
 import { useWorkspaceStore } from '@/store/workspace.store'
-import { formatBytes, getRelativeTime } from '@/lib/utils'
+import { formatBytes, formatNumber, getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Pipeline } from '@/types'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
 
 function statusVariant(s?: string) {
   if (s === 'completed' || s === 'ready' || s === 'success') return 'success' as const
@@ -99,12 +100,12 @@ export default function ExportsPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-5xl">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">Exports &amp; résultats</h1>
-        <p className="text-sm text-gray-500">Téléchargez les sorties de vos pipelines</p>
-      </div>
-
+    <DashboardPageShell
+      helpKey="exports"
+      width="wide"
+      title="Exports & résultats"
+      description="Téléchargez les sorties de vos pipelines"
+    >
       <Tabs defaultValue="exports">
         <TabsList>
           <TabsTrigger value="exports">Exports</TabsTrigger>
@@ -185,11 +186,77 @@ export default function ExportsPage() {
       <Dialog open={detail != null} onOpenChange={(v) => { if (!v) setDetail(null) }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Détail</DialogTitle></DialogHeader>
-          <pre className="max-h-[60vh] overflow-auto rounded-lg bg-background p-3 text-xs text-gray-300 font-mono">
-            {JSON.stringify(detail, null, 2)}
-          </pre>
+          <DetailView detail={detail} />
         </DialogContent>
       </Dialog>
+    </DashboardPageShell>
+  )
+}
+
+// ── Détail visuel (export ou résultat de run) ────────────────────────────────
+function DetailView({ detail }: { detail: unknown }) {
+  if (detail == null) return null
+  const d = detail as Record<string, unknown>
+
+  // Champs « connus » présentés joliment
+  const fields: { label: string; value: React.ReactNode }[] = []
+  const push = (label: string, val: unknown, fmt?: (v: unknown) => React.ReactNode) => {
+    if (val === undefined || val === null || val === '') return
+    fields.push({ label, value: fmt ? fmt(val) : String(val) })
+  }
+  push('Nom', d.name ?? d.filename)
+  push('Pipeline', d.pipeline_name)
+  push('Format', typeof d.format === 'string' ? d.format.toUpperCase() : undefined)
+  push('Statut', d.status, (v) => <Badge variant={statusVariant(String(v))} className="h-5 text-[10px]">{String(v)}</Badge>)
+  push('Lignes', d.rows ?? d.rows_count, (v) => formatNumber(Number(v)))
+  push('Taille', d.size_bytes, (v) => formatBytes(Number(v)))
+  push('Créé', d.created_at, (v) => getRelativeTime(String(v)))
+  push('Run', d.run_id, (v) => <span className="font-mono">#{String(v).slice(-8)}</span>)
+
+  // Aperçu tabulaire si des lignes sont présentes
+  const previewRows = (Array.isArray(d.preview) ? d.preview : Array.isArray(d.data) ? d.data : Array.isArray(d.rows) ? d.rows : []) as Record<string, unknown>[]
+  const cols = previewRows.length > 0 && typeof previewRows[0] === 'object' ? Object.keys(previewRows[0]) : []
+
+  return (
+    <div className="space-y-4">
+      {fields.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {fields.map((f) => (
+            <div key={f.label}>
+              <p className="text-[10px] uppercase tracking-wide text-gray-600">{f.label}</p>
+              <div className="text-sm text-foreground truncate">{f.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {cols.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-gray-500">Aperçu ({previewRows.length} lignes)</p>
+          <div className="max-h-[40vh] overflow-auto rounded-lg border border-border">
+            <table className="w-full text-left text-[11px] font-mono">
+              <thead className="sticky top-0 bg-card">
+                <tr>{cols.map((c) => <th key={c} className="px-2 py-1.5 font-semibold text-gray-400 whitespace-nowrap">{c}</th>)}</tr>
+              </thead>
+              <tbody>
+                {previewRows.slice(0, 100).map((row, i) => (
+                  <tr key={i} className="border-t border-border">
+                    {cols.map((c) => <td key={c} className="px-2 py-1 text-gray-400 whitespace-nowrap max-w-55 truncate">{row[c] == null ? '—' : typeof row[c] === 'object' ? JSON.stringify(row[c]) : String(row[c])}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* JSON brut repliable (pour les devs) */}
+      <details className="group">
+        <summary className="cursor-pointer text-xs text-gray-600 hover:text-gray-400 select-none">Voir le JSON brut</summary>
+        <pre className="mt-2 max-h-60 overflow-auto rounded-lg bg-background p-3 text-[11px] text-gray-500 font-mono">
+          {JSON.stringify(detail, null, 2)}
+        </pre>
+      </details>
     </div>
   )
 }

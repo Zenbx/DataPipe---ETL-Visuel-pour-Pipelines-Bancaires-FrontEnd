@@ -6,6 +6,7 @@ import {
   FileText, Braces, Database, Globe, Filter, Shuffle, Sigma, GitMerge,
   ArrowDownUp, CopyMinus, Terminal, CheckCheck, Bot, DatabaseZap, Download,
   Webhook, Bell, Combine, Split, Clock, Table2, BarChart3,
+  ShieldCheck, ShieldAlert, BadgeCheck,
   type LucideIcon,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ const ICONS: Record<string, LucideIcon> = {
   FileText, Braces, Database, Globe, Filter, Shuffle, Sigma, GitMerge,
   ArrowDownUp, CopyMinus, Terminal, CheckCheck, Bot, DatabaseZap, Download,
   Webhook, Bell, Combine, Split, Clock, Table2, BarChart3,
+  ShieldCheck, ShieldAlert, BadgeCheck,
 }
 
 interface NodeDrawerProps {

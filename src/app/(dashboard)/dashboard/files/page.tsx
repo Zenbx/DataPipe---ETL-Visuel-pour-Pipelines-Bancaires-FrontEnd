@@ -13,6 +13,8 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { formatBytes, getRelativeTime } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { DataFile } from '@/types'
+import { DashboardPageShell } from '@/components/layout/DashboardPageShell'
+import { emitOnboardingEvent } from '@/components/onboarding/OnboardingTracker'
 
 type PreviewData = { columns: string[]; rows: Record<string, unknown>[] }
 
@@ -45,6 +47,7 @@ export default function FilesPage() {
       const result = await filesApi.upload(f, workspaceId)
       setFiles((prev) => [result, ...prev])
       toast.success(`"${f.name}" uploadé — ${result.rows ?? '?'} lignes, ${result.columns ?? '?'} colonnes`)
+      emitOnboardingEvent('datapipe:file-uploaded')
     } catch {
       toast.error('Erreur lors de l\'upload')
     } finally {
@@ -91,17 +94,17 @@ export default function FilesPage() {
   const ACCEPTED = '.csv,.json,.xlsx'
 
   return (
-    <div className="p-6 space-y-5 max-w-5xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Fichiers</h1>
-          <p className="text-sm text-gray-500">{files.length} fichier{files.length > 1 ? 's' : ''}</p>
-        </div>
+    <DashboardPageShell
+      helpKey="files"
+      width="wide"
+      title="Fichiers"
+      description={`${files.length} fichier${files.length > 1 ? 's' : ''}`}
+      actions={(
         <Button onClick={() => inputRef.current?.click()} className="gap-2">
           <Plus className="h-4 w-4" /> Uploader
         </Button>
-      </div>
-
+      )}
+    >
       {/* Drop zone */}
       <div
         className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 transition-colors cursor-pointer ${isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-[#3a3a3a]'}`}
@@ -201,7 +204,7 @@ export default function FilesPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPageShell>
   )
 }
 
